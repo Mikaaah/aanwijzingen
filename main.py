@@ -62,9 +62,9 @@ class Application(tk.Tk):
         self.summary_status = tk.StringVar()
         self.style = ttk.Style(self)
         self.style.theme_use("clam")
-        self.style.configure("Eq.FlatCombo", fieldbackground=WHITE, background=WHITE,
+        self.style.configure("Eq.Flat.TCombobox", fieldbackground=WHITE, background=WHITE,
                              foreground=INK, arrowcolor=INK, borderwidth=0, padding=2)
-        self.style.map("Eq.FlatCombo", fieldbackground=[("readonly", WHITE)],
+        self.style.map("Eq.Flat.TCombobox", fieldbackground=[("readonly", WHITE)],
                        selectbackground=[("readonly", WHITE)],
                        selectforeground=[("readonly", INK)])
         icon = resource_path("assets/eqraft_icon.png")
