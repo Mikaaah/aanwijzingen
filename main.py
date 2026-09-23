@@ -9,8 +9,8 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import traceback
 
-from config import APP_TITLE, DATE_FIELDS, SECTIONS, TYPES, template_path
-from document_generator import TemplateError, export_pdf, generate_docx
+from config import APP_TITLE, DATE_FIELDS, SECTIONS, TYPES, document_values, template_path
+from document_generator import TemplateError, _all_paragraphs, export_pdf, generate_docx
 
 
 def valid_date(text: str):
@@ -28,52 +28,103 @@ class Application(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(APP_TITLE)
-        self.geometry("720x790")
-        self.minsize(610, 540)
+        self.geometry("820x820")
+        self.minsize(650, 550)
+        self.configure(background="#FFFFFF")
         self.widgets = {}
+        self.field_labels = {}
         self.type_var = tk.StringVar(value=next(iter(TYPES)))
+        self.role_preview = tk.StringVar()
+        self.style = ttk.Style(self)
+        self.style.theme_use("clam")
+        self.style.configure("Eq.TCombobox", padding=6, fieldbackground="#FFFFFF")
+        self.style.configure("Eq.TEntry", padding=5, fieldbackground="#FFFFFF")
         self._build()
+        self.type_var.trace_add("write", self._update_role)
+        self._update_role()
 
     def _build(self):
-        outer = ttk.Frame(self, padding=16)
+        banner = tk.Frame(self, bg="#121212", height=82)
+        banner.pack(fill="x")
+        banner.pack_propagate(False)
+        tk.Frame(banner, bg="#FFDE00", width=8).pack(side="left", fill="y")
+        tk.Label(banner, text="EQRAFT", font=("Segoe UI", 18, "bold"),
+                 fg="#FFDE00", bg="#121212").pack(side="left", padx=(20, 20))
+        tk.Label(banner, text=APP_TITLE, font=("Segoe UI", 15, "bold"),
+                 fg="#FFFFFF", bg="#121212").pack(side="left")
+
+        outer = tk.Frame(self, bg="#FFFFFF", padx=22, pady=18)
         outer.pack(fill="both", expand=True)
 
-        select = ttk.Frame(outer)
-        select.pack(fill="x", pady=(0, 12))
-        ttk.Label(select, text="Type aanwijzing:").pack(side="left", padx=(0, 12))
-        ttk.Combobox(select, textvariable=self.type_var, values=list(TYPES),
-                     state="readonly", width=38).pack(side="left", fill="x", expand=True)
+        select = tk.Frame(outer, bg="#FFFFFF")
+        select.pack(fill="x", pady=(0, 9))
+        tk.Label(select, text="Type aanwijzing / registratie", font=("Segoe UI", 10, "bold"),
+                 bg="#FFFFFF", fg="#171717").pack(anchor="w", pady=(0, 5))
+        ttk.Combobox(select, textvariable=self.type_var, values=list(TYPES), style="Eq.TCombobox",
+                     state="readonly", width=45).pack(fill="x")
+        tk.Label(outer, textvariable=self.role_preview, justify="left", wraplength=730,
+                 bg="#FFF7CD", fg="#202020", anchor="w", padx=12, pady=9,
+                 font=("Segoe UI", 9)).pack(fill="x", pady=(0, 12))
 
-        area = ttk.Frame(outer)
+        area = tk.Frame(outer, bg="#FFFFFF")
         area.pack(fill="both", expand=True)
-        canvas = tk.Canvas(area, highlightthickness=0)
+        canvas = tk.Canvas(area, bg="#FFFFFF", highlightthickness=0)
         scrollbar = ttk.Scrollbar(area, orient="vertical", command=canvas.yview)
-        content = ttk.Frame(canvas)
+        content = tk.Frame(canvas, bg="#FFFFFF")
         content.bind("<Configure>", lambda _e: canvas.configure(scrollregion=canvas.bbox("all")))
         window = canvas.create_window((0, 0), window=content, anchor="nw")
         canvas.bind("<Configure>", lambda e: canvas.itemconfigure(window, width=e.width))
         canvas.configure(yscrollcommand=scrollbar.set)
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+        canvas.bind_all("<MouseWheel>", lambda event: canvas.yview_scroll(-int(event.delta / 120), "units"))
 
         for heading, fields in SECTIONS:
-            frame = ttk.LabelFrame(content, text=heading, padding=10)
-            frame.pack(fill="x", pady=(0, 10))
+            card = tk.Frame(content, bg="#FFFFFF", highlightbackground="#E0E0E0",
+                            highlightthickness=1, padx=15, pady=12)
+            card.pack(fill="x", pady=(0, 12), padx=(0, 5))
+            tk.Label(card, text=heading.upper(), bg="#FFFFFF", fg="#111111",
+                     font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 8))
+            tk.Frame(card, bg="#FFDE00", height=3).pack(fill="x", pady=(0, 9))
+            frame = tk.Frame(card, bg="#FFFFFF")
+            frame.pack(fill="x")
             frame.columnconfigure(1, weight=1)
             for row, (label, key, _required, multiline) in enumerate(fields):
-                ttk.Label(frame, text=label + ":").grid(row=row, column=0, sticky="nw", padx=(0, 12), pady=4)
+                label_widget = tk.Label(frame, text=label + ":",
+                                        bg="#FFFFFF", fg="#202020", anchor="w",
+                                        font=("Segoe UI", 9))
+                label_widget.grid(row=row, column=0, sticky="nw", padx=(0, 14), pady=5)
+                self.field_labels[key] = (label_widget, label, _required)
                 if multiline:
-                    widget = tk.Text(frame, height=3, width=40, wrap="word")
+                    widget = tk.Text(frame, height=3, width=42, wrap="word",
+                                     relief="solid", borderwidth=1, font=("Segoe UI", 10),
+                                     bg="#FFFFFF", fg="#111111", insertbackground="#111111")
                 else:
-                    widget = ttk.Entry(frame)
-                widget.grid(row=row, column=1, sticky="ew", pady=4)
+                    widget = ttk.Entry(frame, style="Eq.TEntry", font=("Segoe UI", 10))
+                widget.grid(row=row, column=1, sticky="ew", pady=5)
                 self.widgets[key] = widget
 
-        buttons = ttk.Frame(outer)
+        buttons = tk.Frame(outer, bg="#FFFFFF")
         buttons.pack(fill="x", pady=(12, 0))
-        ttk.Button(buttons, text="Document maken", command=self.create_document).pack(side="left")
-        ttk.Button(buttons, text="Velden wissen", command=self.clear_fields).pack(side="left", padx=10)
-        ttk.Button(buttons, text="Afsluiten", command=self.destroy).pack(side="right")
+        tk.Button(buttons, text="Document maken", command=self.create_document,
+                  bg="#FFDE00", fg="#111111", activebackground="#F2D000",
+                  relief="flat", padx=18, pady=9, font=("Segoe UI", 10, "bold")).pack(side="left")
+        tk.Button(buttons, text="Velden wissen", command=self.clear_fields,
+                  bg="#FFFFFF", fg="#222222", relief="flat", padx=12, pady=9).pack(side="left", padx=10)
+        tk.Button(buttons, text="Afsluiten", command=self.destroy,
+                  bg="#FFFFFF", fg="#222222", relief="flat", padx=12, pady=9).pack(side="right")
+
+    def _update_role(self, *_args):
+        role = TYPES[self.type_var.get()]
+        for key, (widget, label, required) in self.field_labels.items():
+            widget.configure(text=label + (" *" if required or key in role["required_fields"] else "") + ":")
+        prefix = "Instructieregistratie" if role["code"] == "LEEK" else "Aanwijzing"
+        extra = (" Vul de specifiek geïnstrueerde werkzaamheden in."
+                 if role["code"] == "VOP" else "")
+        self.role_preview.set(
+            f"{prefix}: {role['role']}. De verantwoordelijkheden worden automatisch ingevuld. "
+            f"Leg bevoegdheden en grenzen zelf concreet vast.{extra}"
+        )
 
     def _values(self):
         return {
@@ -83,8 +134,10 @@ class Application(tk.Tk):
         }
 
     def _validate(self, values):
+        role = TYPES[self.type_var.get()]
         missing = [label for _heading, fields in SECTIONS
-                   for label, key, required, _multi in fields if required and not values[key]]
+                   for label, key, required, _multi in fields
+                   if (required or key in role["required_fields"]) and not values[key]]
         if missing:
             raise ValueError("Vul eerst de verplichte velden in:\n\n" + "\n".join("• " + label for label in missing))
         parsed = {}
@@ -114,7 +167,8 @@ class Application(tk.Tk):
             template = template_path(choice["template"])
             if not template.is_file():
                 raise FileNotFoundError(f"Sjabloon ontbreekt:\n{template}\n\nPlaats daar je eigen Word-sjabloon.")
-            filename = (f"Aanwijzing {choice['code']} - {safe_filename(values['VOLLEDIGE_NAAM'])}"
+            prefix = "Registratie" if choice["code"] == "LEEK" else "Aanwijzing"
+            filename = (f"{prefix} {choice['code']} - {safe_filename(values['VOLLEDIGE_NAAM'])}"
                         f" - {values['INGANGSDATUM']}.docx")
             selected = filedialog.asksaveasfilename(
                 title="Sla het aanwijzingsformulier op", defaultextension=".docx",
@@ -136,7 +190,7 @@ class Application(tk.Tk):
                                              dir=destination.parent, delete=False) as handle:
                 temporary = Path(handle.name)
             try:
-                generate_docx(template, temporary, values)
+                generate_docx(template, temporary, document_values(values, choice))
                 temporary.replace(destination)
             finally:
                 temporary.unlink(missing_ok=True)
@@ -160,17 +214,19 @@ class Application(tk.Tk):
 
 
 def self_test():
-    """Controleren dat de ingebundelde code en het sjabloon echt samenwerken."""
-    template = template_path(TYPES["Installatieverantwoordelijke (IV)"]["template"])
+    """Genereer alle rollen en controleer op achtergebleven placeholders."""
+    from docx import Document
+    template = template_path(next(iter(TYPES.values()))["template"])
     values = {key: "CONTROLE" for _heading, fields in SECTIONS
               for _label, key, _required, _multi in fields}
-    values.update(INGANGSDATUM="01-01-2026", GELDIG_TOT="01-01-2027",
-                  DATUM_AANWIJZER="01-01-2026", DATUM_AANGEWEZENE="01-01-2026")
+    values.update(INGANGSDATUM="01-01-2026", GELDIG_TOT="01-01-2027")
     with tempfile.TemporaryDirectory() as folder:
-        result = Path(folder) / "controle.docx"
-        generate_docx(template, result, values)
-        if result.stat().st_size < 1000:
-            raise RuntimeError("Het gemaakte Word-document is niet geldig.")
+        for role in TYPES.values():
+            result = Path(folder) / (role["code"] + ".docx")
+            generate_docx(template, result, document_values(values, role))
+            text = "\n".join(p.text for p in _all_paragraphs(Document(result)))
+            if result.stat().st_size < 1000 or "{{" in text or role["responsibilities"] not in text:
+                raise RuntimeError(f"Controle van het Word-document voor {role['code']} mislukt.")
 
 
 def start():
