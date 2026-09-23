@@ -49,10 +49,10 @@ class Application(tk.Tk):
         self.title(APP_TITLE)
         screen_width, screen_height = self.winfo_screenwidth(), self.winfo_screenheight()
         width = min(1180, max(760, screen_width - 44))
-        height = min(840, max(540, screen_height - 90))
+        height = min(840, max(520, screen_height - 120))
         self.geometry(f"{width}x{height}+{max(0, (screen_width-width)//2)}"
                       f"+{max(0, (screen_height-height-42)//2)}")
-        self.minsize(760, 540)
+        self.minsize(760, 520)
         self.configure(bg=BACKGROUND)
         self.widgets = {}
         self.field_labels = {}
@@ -87,18 +87,18 @@ class Application(tk.Tk):
         main = tk.Frame(self, bg=BACKGROUND)
         main.pack(side="left", fill="both", expand=True)
 
-        heading = tk.Frame(main, bg=BACKGROUND, padx=30, pady=21)
+        heading = tk.Frame(main, bg=BACKGROUND, padx=30, pady=15)
         heading.pack(fill="x")
         tk.Label(heading, text="Aanwijzing aanmaken", font=("Segoe UI", 21, "bold"),
                  bg=BACKGROUND, fg=INK).pack(anchor="w")
         tk.Label(heading, text="Leg de aanwijzing duidelijk vast en maak daarna het Word-document.",
                  font=("Segoe UI", 10), bg=BACKGROUND, fg=MUTED).pack(anchor="w", pady=(4, 0))
 
-        overview = Card(main, padding=17)
+        overview = Card(main, padding=14)
         overview.pack(fill="x", padx=28, pady=(0, 12))
         top = overview.body
         tk.Label(top, text="HUIDIGE AANWIJZING", bg=WHITE, fg=MUTED,
-                 font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(0, 11))
+                 font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(0, 8))
         grid = tk.Frame(top, bg=WHITE)
         grid.pack(fill="x")
         for col, (key, label) in enumerate((
@@ -113,7 +113,7 @@ class Application(tk.Tk):
             value = tk.Label(section, textvariable=self.summary[key], bg=WHITE, fg=INK,
                              font=("Segoe UI", 10, "bold"), anchor="w")
             value.pack(anchor="w", pady=(4, 0), fill="x")
-        tk.Frame(top, bg=BORDER, height=1).pack(fill="x", pady=(14, 11))
+        tk.Frame(top, bg=BORDER, height=1).pack(fill="x", pady=(10, 7))
         tk.Label(top, textvariable=self.summary_status, bg=WHITE, fg=INK,
                  font=("Segoe UI", 9)).pack(anchor="w")
 
@@ -145,19 +145,19 @@ class Application(tk.Tk):
         canvas.bind_all("<Button-4>", lambda _e: canvas.yview_scroll(-1, "units"))
         canvas.bind_all("<Button-5>", lambda _e: canvas.yview_scroll(1, "units"))
 
-        role_card = Card(content)
+        role_card = Card(content, padding=18)
         role_card.pack(fill="x", pady=(0, 16))
         tk.Label(role_card.body, text="01  Type aanwijzing", bg=WHITE, fg=INK,
                  font=("Segoe UI", 13, "bold")).pack(anchor="w")
         tk.Label(role_card.body, text="Kies de rol. De bijbehorende verantwoordelijkheden worden automatisch ingevuld.",
                  bg=WHITE, fg=MUTED, font=("Segoe UI", 9),
-                 wraplength=720, justify="left").pack(anchor="w", pady=(4, 16))
+                 wraplength=720, justify="left").pack(anchor="w", pady=(4, 11))
         selection = SelectBox(role_card.body, self.type_var, list(TYPES))
         selection.pack(fill="x")
         self.role_note = tk.Label(role_card.body, textvariable=self.role_preview,
                                   bg=WHITE, fg=MUTED, font=("Segoe UI", 9),
                                   anchor="w", justify="left", wraplength=700)
-        self.role_note.pack(fill="x", pady=(13, 0))
+        self.role_note.pack(fill="x", pady=(9, 0))
 
         for number, (section_name, fields) in enumerate(SECTIONS, start=2):
             card = Card(content)
@@ -290,9 +290,8 @@ class Application(tk.Tk):
             self.role_preview.set("Dit is een instructieregistratie en geen elektrotechnische aanwijzing. "
                                   "Leg het toegestane normale gebruik concreet vast.")
         else:
-            self.role_preview.set("Rolgebonden verantwoordelijkheden en een bevoegdheidskader "
-                                  "worden automatisch toegevoegd. Vul persoonlijke taken, "
-                                  "bevoegdheden en beperkingen zelf in.")
+            self.role_preview.set("De rolteksten worden automatisch ingevuld. "
+                                  "Vul persoonlijke taken, bevoegdheden en grenzen hieronder in.")
         self._update_progress()
 
     def _show_guide(self):
@@ -498,7 +497,7 @@ def start():
                     app.geometry("900x620")
                     app.update()
                     assert app.scroll_canvas.winfo_width() > 400
-                    app.geometry("760x540")
+                    app.geometry("760x520")
                     app.update()
                     assert app.primary_button.winfo_rooty() + app.primary_button.winfo_height() < app.winfo_screenheight()
                     app.geometry("1400x900")
