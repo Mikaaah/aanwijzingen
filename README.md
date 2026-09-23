@@ -20,8 +20,6 @@ geïnstalleerd. Het programma werkt zonder internet. Een PDF wordt ook gemaakt
 als Microsoft Word op die computer beschikbaar is; anders krijg je alleen de
 DOCX en een duidelijke melding.
 
-Je kunt ook de kant-en-klare exe uit deze conversatie downloaden.
-
 ## Indeling
 
 ```text
@@ -32,6 +30,10 @@ NEN3140_Aanwijzingen/
 ├── requirements.txt
 ├── README.md
 ├── .github/workflows/build-windows-exe.yml
+├── assets/
+│   ├── eqraft_logo.png
+│   ├── eqraft_icon.png
+│   └── eqraft_icon.ico
 ├── templates/
 │   └── Aanwijzing_NEN3140.docx
 └── output/
@@ -45,6 +47,11 @@ voor **Verantwoordelijkheden per rol**. Binnen het bevoegdhedenvak staan het
 automatische rolkader en jullie concrete toestemming los van elkaar.
 Organisatie is een invoerveld in de documentinhoud.
 
+Het formulier gebruikt de Eqraft-kleuren en het logo. De Windows-exe heeft
+het Eqraft-icoon. Boven beide handtekeningregels in het Word-sjabloon is extra
+schrijfruimte vrijgemaakt. Het venster bestaat uit drie stappen en toont de
+voortgang bij verplichte velden.
+
 ## Velden invullen en sjabloon aanpassen
 
 Selecteer de rol en vul de gegevens in. Velden met een sterretje zijn verplicht.
@@ -53,6 +60,14 @@ en de **plaats en datum van aanwijzing** zijn ingevuld; bij IV en WV is ook het
 **Verantwoordelijkheidsgebied** verplicht. Vul in het vak **Bevoegdheden /
 toegestane handelingen** de daadwerkelijk door Eqraft toegestane handelingen
 in. Alle data hebben formaat `dd-mm-jjjj`.
+
+1. Kies IV, WV, VP, VOP of Leek. Bij Leek registreer je instructie; dit is geen elektrotechnische aanwijzing.
+2. Vul gegevens, installaties, taken, persoonlijke bevoegdheden en beperkingen in. De rolgebonden teksten volgen automatisch uit de gekozen rol.
+3. Klik op **Document maken**, kies waar je het Word-bestand opslaat en controleer het resultaat. Als Microsoft Word aanwezig is, wordt ook een PDF gemaakt.
+
+De aanwijzer beoordeelt de kennis en ervaring van de persoon, de concrete
+werkzaamheden en de grenzen vóór ondertekening. Het programma kan die
+beoordeling niet voor de aanwijzer doen.
 
 Wil je de opmaak of vaste tekst wijzigen, open dan
 `templates/Aanwijzing_NEN3140.docx` in Word. Zet desgewenst een kopie van
@@ -113,10 +128,10 @@ python main.py
 De exacte opdracht voor één Windows-exe:
 
 ```powershell
-python -m PyInstaller --onefile --noconsole --name NEN3140_Aanwijzingen --add-data "templates;templates" main.py
+python -m PyInstaller --onefile --noconsole --name NEN3140_Aanwijzingen --icon assets/eqraft_icon.ico --add-data "templates;templates" --add-data "assets;assets" main.py
 ```
 
 De Windows-bouwserver van GitHub voert deze opdracht automatisch uit bij een
-push naar `main`; je hoeft lokaal niets te installeren om de exe te gebruiken.
+push naar `main` of in een pull request; je hoeft lokaal niets te installeren.
 Met `NEN3140_Aanwijzingen.exe --self-test` controleer je alle vijf rollen en
 het meegeleverde sjabloon zonder het venster te openen.

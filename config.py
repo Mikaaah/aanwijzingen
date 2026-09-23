@@ -148,3 +148,14 @@ def template_path(filename: str) -> Path:
         if bundled.is_file():
             return bundled
     return external
+
+
+def resource_path(filename: str) -> Path:
+    """Zoek afbeeldingen ook in de tijdelijke map van een PyInstaller-exe."""
+    program_dir = Path(sys.executable if getattr(sys, "frozen", False) else __file__).resolve().parent
+    external = program_dir / filename
+    if external.is_file():
+        return external
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS) / filename
+    return external
