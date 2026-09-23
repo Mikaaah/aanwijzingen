@@ -126,7 +126,7 @@ class InputBox(tk.Canvas):
 
 
 class SelectBox(tk.Canvas):
-    def __init__(self, parent, variable, options, style="Eq.FlatCombo"):
+    def __init__(self, parent, variable, options, style="Eq.Flat.TCombobox"):
         super().__init__(parent, bg=WHITE, highlightthickness=0, height=42)
         self.combo = ttk.Combobox(self, textvariable=variable, values=options,
                                   state="readonly", style=style,
