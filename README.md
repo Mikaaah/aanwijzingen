@@ -25,6 +25,7 @@ DOCX en een duidelijke melding.
 ```text
 NEN3140_Aanwijzingen/
 ├── main.py
+├── ui_components.py
 ├── config.py
 ├── document_generator.py
 ├── requirements.txt
@@ -32,6 +33,7 @@ NEN3140_Aanwijzingen/
 ├── .github/workflows/build-windows-exe.yml
 ├── assets/
 │   ├── eqraft_logo.png
+│   ├── eqraft_logo_light.png
 │   ├── eqraft_icon.png
 │   └── eqraft_icon.ico
 ├── templates/
@@ -49,7 +51,10 @@ Organisatie is een invoerveld in de documentinhoud.
 
 Het formulier gebruikt de Eqraft-kleuren en het logo. De Windows-exe heeft
 het Eqraft-icoon. Boven beide handtekeningregels in het Word-sjabloon is extra
-schrijfruimte vrijgemaakt. Het venster bestaat uit drie stappen en toont de
+schrijfruimte vrijgemaakt. Links staan de werkende opties **Aanwijzing maken**,
+**Uitleg en werkwijze** en **Afsluiten**. Boven het formulier zie je direct de
+persoon, het type, de locatie en of de bevoegdheden zijn ingevuld. Kaarten en
+invoervelden hebben een rustige, afgeronde Eqraft-opmaak. Onderaan zie je de
 voortgang bij verplichte velden.
 
 ## Velden invullen en sjabloon aanpassen

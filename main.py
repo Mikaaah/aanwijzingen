@@ -1,4 +1,4 @@
-"""Startvenster voor het invullen van NEN 3140-aanwijzingssjablonen."""
+"""Eqraft-formulier voor het invullen van NEN 3140-aanwijzingssjablonen."""
 
 from datetime import datetime
 from pathlib import Path
@@ -11,27 +11,24 @@ import traceback
 
 from config import APP_TITLE, DATE_FIELDS, SECTIONS, TYPES, document_values, template_path, resource_path
 from document_generator import TemplateError, _all_paragraphs, export_pdf, generate_docx
+from ui_components import (ActionButton, BACKGROUND, BORDER, Card, DARK, ERROR,
+                           INK, InputBox, MUTED, NavItem, SelectBox, WHITE, YELLOW)
 
-INK = "#181818"
-MUTED = "#61656B"
-YELLOW = "#FFDE00"
-PAPER = "#FFFFFF"
-CANVAS = "#F3F4F5"
 
 SECTION_TIPS = {
-    "Gegevens persoon": "Wie wordt aangewezen en voor welke periode?",
-    "Omvang en werkzaamheden": "Noem de locatie, de installatiedelen en de concrete werkzaamheden.",
-    "Bevoegdheden en grenzen": "Schrijf op wat deze persoon daadwerkelijk mag doen en waar de grens ligt.",
-    "Namens de organisatie": "Wie geeft deze aanwijzing af? Vul ook plaats en datum in.",
-    "Ondertekening betrokkene": "Datum waarop de betrokkene het document ondertekent.",
+    "Gegevens persoon": "Vul de persoon en de periode van deze aanwijzing in.",
+    "Omvang en werkzaamheden": "Baken locatie, installaties en de toegestane werkzaamheden concreet af.",
+    "Bevoegdheden en grenzen": "Leg hier vast wat deze persoon mag doen en welke grenzen gelden.",
+    "Namens de organisatie": "Gegevens van degene die de aanwijzing afgeeft.",
+    "Ondertekening betrokkene": "De datum waarop de betrokken persoon ondertekent.",
 }
 
 FIELD_TIPS = {
-    "INSTALLATIES": "Bijvoorbeeld gebouwinstallaties, een machine of afzonderlijke besturingskasten.",
-    "VERANTWOORDELIJKHEIDSGEBIED": "Baken af welke installaties en locaties bij deze persoon horen.",
-    "WERKZAAMHEDEN": "Bij VOP: noem elke toegestane taak en bijbehorende instructie afzonderlijk.",
-    "BEVOEGDHEDEN": "Leg eigen bevoegdheden vast; het automatische rolkader staat apart in het document.",
-    "BEPERKINGEN": "Denk aan uitgesloten werkzaamheden, toezicht en afspraken bij afwijkingen.",
+    "INSTALLATIES": "Welke machine, gebouwinstallatie of installatiedelen vallen hieronder?",
+    "VERANTWOORDELIJKHEIDSGEBIED": "Waar begint en eindigt de verantwoordelijkheid van deze persoon?",
+    "WERKZAAMHEDEN": "Voor VOP: beschrijf elke toegestane taak en de gegeven instructie.",
+    "BEVOEGDHEDEN": "Vul persoonlijke toestemming in. Het automatische rolkader staat apart in Word.",
+    "BEPERKINGEN": "Noem uitgesloten taken, toezicht of afspraken bij afwijkingen.",
 }
 
 
@@ -50,23 +47,26 @@ class Application(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(APP_TITLE)
-        self.geometry("1020x840")
-        self.minsize(750, 590)
-        self.configure(background=CANVAS)
+        self.geometry("1180x840")
+        self.minsize(900, 620)
+        self.configure(bg=BACKGROUND)
         self.widgets = {}
         self.field_labels = {}
+        self.field_frames = {}
+        self.error_keys = set()
         self.logo_image = None
         self.type_var = tk.StringVar(value=next(iter(TYPES)))
         self.role_preview = tk.StringVar()
         self.progress_text = tk.StringVar()
+        self.summary = {name: tk.StringVar() for name in ("person", "role", "location", "authority")}
+        self.summary_status = tk.StringVar()
         self.style = ttk.Style(self)
         self.style.theme_use("clam")
-        self.style.configure("Eq.TCombobox", padding=9, fieldbackground=PAPER,
-                             foreground=INK, arrowcolor=INK, bordercolor="#C9CDD2")
-        self.style.map("Eq.TCombobox", fieldbackground=[("readonly", PAPER)],
-                       selectbackground=[("readonly", PAPER)], selectforeground=[("readonly", INK)])
-        self.style.configure("Eq.TEntry", padding=9, fieldbackground=PAPER,
-                             foreground=INK, bordercolor="#C9CDD2", lightcolor=YELLOW)
+        self.style.configure("Eq.FlatCombo", fieldbackground=WHITE, background=WHITE,
+                             foreground=INK, arrowcolor=INK, borderwidth=0, padding=2)
+        self.style.map("Eq.FlatCombo", fieldbackground=[("readonly", WHITE)],
+                       selectbackground=[("readonly", WHITE)],
+                       selectforeground=[("readonly", INK)])
         icon = resource_path("assets/eqraft_icon.png")
         if icon.is_file():
             try:
@@ -79,96 +79,115 @@ class Application(tk.Tk):
         self._update_role()
 
     def _build(self):
-        banner = tk.Frame(self, bg=PAPER, padx=27, pady=12)
-        banner.pack(fill="x")
-        logo = resource_path("assets/eqraft_logo.png")
-        if logo.is_file():
-            try:
-                self.logo_image = tk.PhotoImage(file=str(logo)).subsample(2, 2)
-                tk.Label(banner, image=self.logo_image, bg=PAPER).pack(side="left", padx=(0, 28))
-            except tk.TclError:
-                pass
-        if self.logo_image is None:
-            tk.Label(banner, text="EQRAFT", font=("Segoe UI", 18, "bold"),
-                     fg=INK, bg=PAPER).pack(side="left", padx=(0, 28))
-        title = tk.Frame(banner, bg=PAPER)
-        title.pack(side="left")
-        tk.Label(title, text=APP_TITLE, font=("Segoe UI", 17, "bold"),
-                 fg=INK, bg=PAPER).pack(anchor="w")
-        tk.Label(title, text="Maak een aanwijzing op basis van het Eqraft Word-sjabloon",
-                 font=("Segoe UI", 9), fg=MUTED, bg=PAPER).pack(anchor="w", pady=(2, 0))
-        tk.Frame(self, bg=YELLOW, height=4).pack(fill="x")
+        self._build_sidebar()
+        main = tk.Frame(self, bg=BACKGROUND)
+        main.pack(side="left", fill="both", expand=True)
 
-        outer = tk.Frame(self, bg=CANVAS, padx=28, pady=19)
-        outer.pack(fill="both", expand=True)
+        heading = tk.Frame(main, bg=BACKGROUND, padx=30, pady=21)
+        heading.pack(fill="x")
+        tk.Label(heading, text="Aanwijzing aanmaken", font=("Segoe UI", 21, "bold"),
+                 bg=BACKGROUND, fg=INK).pack(anchor="w")
+        tk.Label(heading, text="Leg de aanwijzing duidelijk vast en maak daarna het Word-document.",
+                 font=("Segoe UI", 10), bg=BACKGROUND, fg=MUTED).pack(anchor="w", pady=(4, 0))
 
-        select = tk.Frame(outer, bg=PAPER, padx=18, pady=13,
-                          highlightthickness=1, highlightbackground="#E3E5E7")
-        select.pack(fill="x", pady=(0, 12))
-        tk.Label(select, text="1  KIES DE AANWIJZING", font=("Segoe UI", 10, "bold"),
-                 bg=PAPER, fg=INK).pack(anchor="w", pady=(0, 6))
-        ttk.Combobox(select, textvariable=self.type_var, values=list(TYPES), style="Eq.TCombobox",
-                     state="readonly", font=("Segoe UI", 10)).pack(fill="x")
-        tk.Label(select, textvariable=self.role_preview, justify="left", wraplength=860,
-                 bg="#FFF8D4", fg=INK, anchor="w", padx=12, pady=10,
-                 font=("Segoe UI", 9)).pack(fill="x", pady=(11, 0))
+        overview = Card(main, padding=17)
+        overview.pack(fill="x", padx=28, pady=(0, 12))
+        top = overview.body
+        tk.Label(top, text="HUIDIGE AANWIJZING", bg=WHITE, fg=MUTED,
+                 font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(0, 11))
+        grid = tk.Frame(top, bg=WHITE)
+        grid.pack(fill="x")
+        for col, (key, label) in enumerate((
+            ("person", "PERSOON"), ("role", "TYPE"),
+            ("location", "LOCATIE"), ("authority", "BEVOEGDHEDEN")
+        )):
+            grid.columnconfigure(col, weight=1, uniform="overview")
+            section = tk.Frame(grid, bg=WHITE)
+            section.grid(row=0, column=col, sticky="ew", padx=(0, 9))
+            tk.Label(section, text=label, font=("Segoe UI", 8, "bold"),
+                     bg=WHITE, fg=MUTED).pack(anchor="w")
+            value = tk.Label(section, textvariable=self.summary[key], bg=WHITE, fg=INK,
+                             font=("Segoe UI", 10, "bold"), anchor="w")
+            value.pack(anchor="w", pady=(4, 0), fill="x")
+        tk.Frame(top, bg=BORDER, height=1).pack(fill="x", pady=(14, 11))
+        tk.Label(top, textvariable=self.summary_status, bg=WHITE, fg=INK,
+                 font=("Segoe UI", 9)).pack(anchor="w")
 
-        tk.Label(outer, text="2  VUL DE GEGEVENS IN", font=("Segoe UI", 10, "bold"),
-                 bg=CANVAS, fg=INK).pack(anchor="w", pady=(3, 9))
-        area = tk.Frame(outer, bg=CANVAS)
-        area.pack(fill="both", expand=True)
-        canvas = tk.Canvas(area, bg=CANVAS, highlightthickness=0)
+        action_bar = tk.Frame(main, bg=WHITE, padx=28, pady=13)
+        action_bar.pack(side="bottom", fill="x")
+        tk.Frame(action_bar, bg=BORDER, height=1).pack(side="top", fill="x", pady=(0, 10))
+        actions = tk.Frame(action_bar, bg=WHITE)
+        actions.pack(fill="x")
+        ActionButton(actions, "Document maken", self.create_document, primary=True,
+                     width=183).pack(side="right", padx=(10, 0))
+        ActionButton(actions, "Velden wissen", self.clear_fields, width=142).pack(side="right")
+        tk.Label(actions, textvariable=self.progress_text, bg=WHITE, fg=MUTED,
+                 font=("Segoe UI", 9)).pack(side="left")
+
+        area = tk.Frame(main, bg=BACKGROUND)
+        area.pack(fill="both", expand=True, padx=(28, 18))
+        canvas = tk.Canvas(area, bg=BACKGROUND, highlightthickness=0)
         scrollbar = ttk.Scrollbar(area, orient="vertical", command=canvas.yview)
-        content = tk.Frame(canvas, bg=CANVAS)
+        content = tk.Frame(canvas, bg=BACKGROUND)
         self.scroll_canvas, self.content = canvas, content
+        self.content_window = canvas.create_window((0, 0), window=content, anchor="nw")
         content.bind("<Configure>", lambda _e: canvas.configure(scrollregion=canvas.bbox("all")))
-        window = canvas.create_window((0, 0), window=content, anchor="nw")
-        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(window, width=e.width))
+        canvas.bind("<Configure>", self._resize_scroll_content)
         canvas.configure(yscrollcommand=scrollbar.set)
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
         canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        canvas.bind_all("<Button-4>", lambda _e: canvas.yview_scroll(-1, "units"))
+        canvas.bind_all("<Button-5>", lambda _e: canvas.yview_scroll(1, "units"))
 
-        for number, (heading, fields) in enumerate(SECTIONS, start=1):
-            card = tk.Frame(content, bg=PAPER, highlightbackground="#E3E5E7",
-                            highlightthickness=1, padx=19, pady=14)
-            card.pack(fill="x", pady=(0, 13), padx=(0, 7))
-            tk.Label(card, text=f"{number:02d}  {heading}", bg=PAPER, fg=INK,
-                     font=("Segoe UI", 11, "bold")).pack(anchor="w")
-            tk.Label(card, text=SECTION_TIPS[heading], bg=PAPER, fg=MUTED,
-                     font=("Segoe UI", 9)).pack(anchor="w", pady=(2, 12))
-            frame = tk.Frame(card, bg=PAPER)
-            frame.pack(fill="x")
-            frame.columnconfigure(0, weight=1, uniform="fields")
-            frame.columnconfigure(1, weight=1, uniform="fields")
+        role_card = Card(content)
+        role_card.pack(fill="x", pady=(0, 16))
+        tk.Label(role_card.body, text="01  Type aanwijzing", bg=WHITE, fg=INK,
+                 font=("Segoe UI", 13, "bold")).pack(anchor="w")
+        tk.Label(role_card.body, text="Kies de rol. De bijbehorende verantwoordelijkheden worden automatisch ingevuld.",
+                 bg=WHITE, fg=MUTED, font=("Segoe UI", 9),
+                 wraplength=720, justify="left").pack(anchor="w", pady=(4, 16))
+        selection = SelectBox(role_card.body, self.type_var, list(TYPES))
+        selection.pack(fill="x")
+        self.role_note = tk.Label(role_card.body, textvariable=self.role_preview,
+                                  bg=WHITE, fg=MUTED, font=("Segoe UI", 9),
+                                  anchor="w", justify="left", wraplength=700)
+        self.role_note.pack(fill="x", pady=(13, 0))
+
+        for number, (section_name, fields) in enumerate(SECTIONS, start=2):
+            card = Card(content)
+            card.pack(fill="x", pady=(0, 16))
+            body = card.body
+            tk.Label(body, text=f"{number:02d}  {section_name}", bg=WHITE, fg=INK,
+                     font=("Segoe UI", 13, "bold")).pack(anchor="w")
+            tk.Label(body, text=SECTION_TIPS[section_name], bg=WHITE, fg=MUTED,
+                     font=("Segoe UI", 9), wraplength=720,
+                     justify="left").pack(anchor="w", pady=(3, 18))
+            fields_grid = tk.Frame(body, bg=WHITE)
+            fields_grid.pack(fill="x")
+            fields_grid.columnconfigure(0, weight=1, uniform="fields")
+            fields_grid.columnconfigure(1, weight=1, uniform="fields")
             row = col = 0
             for label, key, required, multiline in fields:
                 if multiline and col:
                     row, col = row + 1, 0
-                box = tk.Frame(frame, bg=PAPER)
-                box.grid(row=row, column=0 if multiline else col,
-                         columnspan=2 if multiline else 1, sticky="ew",
-                         padx=(0, 0 if multiline or col else 14), pady=(0, 12))
-                label_widget = tk.Label(box, text=label + ":", bg=PAPER,
-                                        fg=INK, anchor="w", font=("Segoe UI", 9, "bold"))
-                label_widget.pack(anchor="w", pady=(0, 5))
+                field = tk.Frame(fields_grid, bg=WHITE)
+                field.grid(row=row, column=0 if multiline else col,
+                           columnspan=2 if multiline else 1, sticky="ew",
+                           padx=(0, 0 if multiline or col else 16), pady=(0, 15))
+                label_widget = tk.Label(field, text=label, bg=WHITE, fg=INK,
+                                        font=("Segoe UI", 9, "bold"), anchor="w")
+                label_widget.pack(anchor="w", pady=(0, 7))
                 self.field_labels[key] = (label_widget, label, required)
-                if multiline:
-                    widget = tk.Text(box, height=3, wrap="word", relief="solid",
-                                     borderwidth=1, highlightthickness=1,
-                                     highlightbackground="#C9CDD2", highlightcolor=YELLOW,
-                                     font=("Segoe UI", 10), bg=PAPER, fg=INK,
-                                     insertbackground=INK, padx=8, pady=6)
-                    widget.bind("<KeyRelease>", self._update_progress)
-                else:
-                    widget = ttk.Entry(box, style="Eq.TEntry", font=("Segoe UI", 10))
-                    widget.bind("<KeyRelease>", self._update_progress)
-                widget.pack(fill="x")
-                self.widgets[key] = widget
+                wrapper = InputBox(field, multiline=multiline,
+                                   on_change=lambda *_args, field_key=key: self._field_changed(field_key))
+                wrapper.pack(fill="x")
+                self.field_frames[key] = wrapper
+                self.widgets[key] = wrapper.widget
                 if key in FIELD_TIPS:
-                    tk.Label(box, text=FIELD_TIPS[key], bg=PAPER, fg=MUTED,
-                             anchor="w", font=("Segoe UI", 8),
-                             wraplength=770).pack(anchor="w", pady=(4, 0))
+                    tk.Label(field, text=FIELD_TIPS[key], bg=WHITE, fg=MUTED,
+                             font=("Segoe UI", 8), wraplength=710,
+                             justify="left").pack(anchor="w", pady=(5, 0))
                 if multiline:
                     row += 1
                 elif col:
@@ -176,49 +195,148 @@ class Application(tk.Tk):
                 else:
                     col = 1
 
-        buttons = tk.Frame(outer, bg=CANVAS)
-        buttons.pack(fill="x", pady=(12, 0))
-        tk.Label(buttons, text="3  CONTROLEER EN MAAK HET DOCUMENT",
-                 bg=CANVAS, fg=INK, font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(0, 8))
-        actions = tk.Frame(buttons, bg=CANVAS)
-        actions.pack(fill="x")
-        tk.Button(actions, text="Document maken", command=self.create_document,
-                  bg=YELLOW, fg=INK, activebackground="#EFCF00", cursor="hand2",
-                  relief="flat", padx=22, pady=11, font=("Segoe UI", 10, "bold")).pack(side="left")
-        tk.Button(actions, text="Velden wissen", command=self.clear_fields,
-                  bg=PAPER, fg=INK, cursor="hand2", relief="flat",
-                  padx=15, pady=11, font=("Segoe UI", 9)).pack(side="left", padx=10)
-        tk.Button(actions, text="Afsluiten", command=self.destroy,
-                  bg=CANVAS, fg=INK, relief="flat", padx=12, pady=11).pack(side="right")
-        tk.Label(buttons, textvariable=self.progress_text, bg=CANVAS,
-                 fg=MUTED, font=("Segoe UI", 9)).pack(anchor="w", pady=(9, 0))
+    def _build_sidebar(self):
+        sidebar = tk.Frame(self, bg=DARK, width=222)
+        sidebar.pack(side="left", fill="y")
+        sidebar.pack_propagate(False)
+        logo = resource_path("assets/eqraft_logo_light.png")
+        if logo.is_file():
+            try:
+                self.logo_image = tk.PhotoImage(file=str(logo))
+                tk.Label(sidebar, image=self.logo_image, bg=DARK).pack(anchor="w", padx=20, pady=(25, 24))
+            except tk.TclError:
+                pass
+        if self.logo_image is None:
+            tk.Label(sidebar, text="EQRAFT", bg=DARK, fg=WHITE,
+                     font=("Segoe UI", 19, "bold")).pack(anchor="w", padx=24, pady=(30, 28))
+        tk.Label(sidebar, text="WERKOMGEVING", bg=DARK, fg="#8C9199",
+                 font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=24, pady=(0, 12))
+        NavItem(sidebar, "Aanwijzing maken", lambda: self.scroll_canvas.yview_moveto(0),
+                selected=True).pack(fill="x", padx=13, pady=(0, 6))
+        NavItem(sidebar, "Uitleg en werkwijze", self._show_guide).pack(fill="x", padx=13)
+
+        bottom = tk.Frame(sidebar, bg=DARK)
+        bottom.pack(side="bottom", fill="x", padx=18, pady=22)
+        tk.Frame(bottom, bg="#34373C", height=1).pack(fill="x", pady=(0, 12))
+        NavItem(bottom, "Afsluiten", self.destroy).pack(fill="x")
+        tk.Label(bottom, text="NEN 3140  ·  EQRAFT", bg=DARK, fg="#898F96",
+                 font=("Segoe UI", 8)).pack(anchor="w", padx=12, pady=(12, 0))
+
+    def _resize_scroll_content(self, event):
+        width = max(1, min(900, event.width - 12))
+        self.scroll_canvas.coords(self.content_window, (event.width - width) / 2, 0)
+        self.scroll_canvas.itemconfigure(self.content_window, width=width)
+        self.role_note.configure(wraplength=max(200, width - 100))
 
     def _on_mousewheel(self, event):
-        if self.winfo_containing(event.x_root, event.y_root) and event.delta:
+        widget = self.winfo_containing(event.x_root, event.y_root)
+        while widget is not None and widget != self.scroll_canvas:
+            widget = getattr(widget, "master", None)
+        if widget == self.scroll_canvas and event.delta:
             self.scroll_canvas.yview_scroll(-int(event.delta / 120), "units")
+
+    def _field_changed(self, key):
+        self.error_keys.discard(key)
+        box = self.field_frames[key]
+        if box.state == "error":
+            box.state = "focus"
+            box._draw()
+        self._update_progress()
 
     def _update_progress(self, *_args):
         role = TYPES[self.type_var.get()]
         required = {key for _, fields in SECTIONS for _, key, mandatory, _ in fields
                     if mandatory or key in role["required_fields"]}
         values = self._values()
-        complete = sum(bool(values[key]) for key in required)
-        self.progress_text.set(f"{complete} van {len(required)} verplichte velden ingevuld  ·  "
-                               "Het Word-document wordt op een zelfgekozen plek opgeslagen.")
+        count = sum(bool(values[key]) for key in required)
+        self.progress_text.set(f"{count} / {len(required)} verplichte velden ingevuld")
+        missing = len(required) - count
+        if missing:
+            self.summary_status.set(f"Nog {missing} verplichte velden invullen voordat je het document kunt maken.")
+        else:
+            try:
+                start, until = valid_date(values["INGANGSDATUM"]), valid_date(values["GELDIG_TOT"])
+                if until < start:
+                    raise ValueError("einddatum voor ingangsdatum")
+                for field in DATE_FIELDS:
+                    if values[field]:
+                        valid_date(values[field])
+            except ValueError:
+                self.summary_status.set("Alle velden ingevuld · controleer de datums (dd-mm-jjjj).")
+            else:
+                self.summary_status.set("Alle verplichte velden ingevuld · klaar voor controle en opslag.")
+        self.summary["person"].set(values["VOLLEDIGE_NAAM"] or "Nog invullen")
+        self.summary["role"].set(role["code"])
+        self.summary["location"].set(values["LOCATIE"] or "Nog invullen")
+        self.summary["authority"].set("Ingevuld" if values["BEVOEGDHEDEN"] else "Nog invullen")
 
     def _update_role(self, *_args):
         role = TYPES[self.type_var.get()]
-        for key, (widget, label, required) in self.field_labels.items():
-            widget.configure(text=label + (" *" if required or key in role["required_fields"] else "") + ":")
-        prefix = "Instructieregistratie" if role["code"] == "LEEK" else "Aanwijzing"
-        extra = (" Vul de specifiek geïnstrueerde werkzaamheden in."
-                 if role["code"] == "VOP" else "")
-        self.role_preview.set(
-            f"{prefix}: {role['role']}. Het rolkader en de verantwoordelijkheden worden "
-            f"automatisch ingevuld. Leg de persoonlijke bevoegdheden, werkzaamheden en "
-            f"beperkingen zelf concreet vast.{extra}"
-        )
+        for key, (label_widget, label, required) in self.field_labels.items():
+            label_widget.configure(text=label + ("  *" if required or key in role["required_fields"] else ""))
+        if role["code"] == "LEEK":
+            self.role_preview.set("Dit is een instructieregistratie en geen elektrotechnische aanwijzing. "
+                                  "Leg het toegestane normale gebruik concreet vast.")
+        else:
+            self.role_preview.set("Rolgebonden verantwoordelijkheden en een bevoegdheidskader "
+                                  "worden automatisch toegevoegd. Vul persoonlijke taken, "
+                                  "bevoegdheden en beperkingen zelf in.")
         self._update_progress()
+
+    def _show_guide(self):
+        self._dialog(
+            "Zo werkt het",
+            "1. Kies IV, WV, VP, VOP of Leek. Leek is een instructieregistratie.\n\n"
+            "2. Vul alle velden met * in. Beschrijf installaties, werkzaamheden en persoonlijke "
+            "bevoegdheden concreet. De rolteksten worden automatisch ingevuld.\n\n"
+            "3. Klik op Document maken en kies een opslagplaats. Controleer het Word-document "
+            "voordat het wordt ondertekend. Staat Microsoft Word op deze computer, dan wordt "
+            "ook een PDF gemaakt.",
+            kind="info",
+        )
+
+    def _dialog(self, title, message, kind="info", confirm=False):
+        dialog = tk.Toplevel(self)
+        dialog.title(title)
+        dialog.configure(bg=BACKGROUND)
+        dialog.resizable(False, False)
+        dialog.transient(self)
+        dialog.geometry("510x390" if len(message) > 260 else "510x275")
+        dialog.minsize(510, 245)
+        dialog.update_idletasks()
+        dialog.geometry(f"+{self.winfo_rootx() + max(0, (self.winfo_width() - 510) // 2)}"
+                        f"+{self.winfo_rooty() + max(0, (self.winfo_height() - dialog.winfo_height()) // 2)}")
+        card = Card(dialog, padding=24, expand=True)
+        card.pack(fill="both", expand=True, padx=15, pady=15)
+        tk.Label(card.body, text=title, bg=WHITE, fg=INK,
+                 font=("Segoe UI", 15, "bold")).pack(anchor="w", pady=(0, 13))
+        label = tk.Label(card.body, text=message, bg=WHITE,
+                         fg=ERROR if kind == "error" else INK,
+                         font=("Segoe UI", 10), wraplength=430,
+                         justify="left", anchor="nw")
+        label.pack(fill="x", pady=(0, 15))
+        result = {"value": False}
+
+        def close(value=False):
+            result["value"] = value
+            dialog.grab_release()
+            dialog.destroy()
+
+        buttons = tk.Frame(card.body, bg=WHITE)
+        buttons.pack(side="bottom", anchor="e", fill="x")
+        if confirm:
+            ActionButton(buttons, "Nee, behouden", lambda: close(False),
+                         width=145).pack(side="right", padx=(10, 0))
+            ActionButton(buttons, "Ja, doorgaan", lambda: close(True),
+                         primary=True, width=145).pack(side="right")
+        else:
+            ActionButton(buttons, "Sluiten", close, primary=True,
+                         width=115).pack(side="right")
+        dialog.protocol("WM_DELETE_WINDOW", lambda: close(False))
+        dialog.bind("<Escape>", lambda _e: close(False))
+        dialog.grab_set()
+        dialog.wait_window()
+        return result["value"]
 
     def _values(self):
         return {
@@ -255,6 +373,8 @@ class Application(tk.Tk):
     def _focus_field(self, key):
         widget = self.widgets[key]
         widget.focus_set()
+        self.error_keys.add(key)
+        self.field_frames[key].set_error()
         self.update_idletasks()
         offset = widget.winfo_rooty() - self.content.winfo_rooty()
         total = max(1, self.content.winfo_height())
@@ -266,6 +386,10 @@ class Application(tk.Tk):
                 widget.delete("1.0", "end")
             else:
                 widget.delete(0, "end")
+        self.error_keys.clear()
+        for box in self.field_frames.values():
+            box.state = "normal"
+            box._draw()
         self._update_progress()
         self.scroll_canvas.yview_moveto(0)
 
@@ -289,8 +413,9 @@ class Application(tk.Tk):
             destination = Path(selected)
             if destination.resolve() == template.resolve():
                 raise ValueError("Kies een andere bestandsnaam: het sjabloon mag niet worden overschreven.")
-            if destination.exists() and not messagebox.askyesno(
-                "Bestand bestaat al", f"Dit document bestaat al:\n{destination}\n\nOverschrijven?"
+            if destination.exists() and not self._dialog(
+                "Bestand bestaat al", f"Dit document bestaat al:\n{destination}\n\nOverschrijven?",
+                confirm=True
             ):
                 return
 
@@ -306,21 +431,22 @@ class Application(tk.Tk):
                 temporary.unlink(missing_ok=True)
 
             pdf = destination.with_suffix(".pdf")
-            if pdf.exists() and not messagebox.askyesno(
-                "PDF bestaat al", f"Deze PDF bestaat al:\n{pdf}\n\nOverschrijven?"
+            if pdf.exists() and not self._dialog(
+                "PDF bestaat al", f"Deze PDF bestaat al:\n{pdf}\n\nOverschrijven?",
+                confirm=True
             ):
-                messagebox.showinfo("Document gemaakt", f"Word-document opgeslagen:\n{destination}\n\nPDF overgeslagen.")
+                self._dialog("Document gemaakt", f"Word-document opgeslagen:\n{destination}\n\nPDF overgeslagen.")
                 return
 
             success, reason = export_pdf(destination, pdf)
             if success:
-                messagebox.showinfo("Documenten gemaakt", f"Word-document:\n{destination}\n\nPDF:\n{pdf}")
+                self._dialog("Documenten gemaakt", f"Word-document:\n{destination}\n\nPDF:\n{pdf}")
             else:
-                messagebox.showwarning("Word-document gemaakt", f"Word-document opgeslagen:\n{destination}\n\nGeen PDF gemaakt. {reason}")
+                self._dialog("Word-document gemaakt", f"Word-document opgeslagen:\n{destination}\n\nGeen PDF gemaakt. {reason}", kind="warning")
         except (ValueError, FileNotFoundError, TemplateError) as exc:
-            messagebox.showerror("Controleer de gegevens", str(exc))
+            self._dialog("Controleer de gegevens", str(exc), kind="error")
         except Exception as exc:
-            messagebox.showerror("Document niet gemaakt", f"Er is iets misgegaan:\n{exc}")
+            self._dialog("Document niet gemaakt", f"Er is iets misgegaan:\n{exc}", kind="error")
 
 
 def self_test():
@@ -349,8 +475,21 @@ def start():
                 try:
                     for role in TYPES:
                         app.type_var.set(role)
-                        app.update_idletasks()
+                        app.update()
                         assert app.widgets and app.role_preview.get()
+                        assert app.summary["role"].get() == TYPES[role]["code"]
+                    app.widgets["VOLLEDIGE_NAAM"].insert(0, "Controlepersoon")
+                    app.widgets["LOCATIE"].insert(0, "Emmeloord")
+                    app._update_progress()
+                    assert app.summary["person"].get() == "Controlepersoon"
+                    assert app.summary["location"].get() == "Emmeloord"
+                    app.geometry("900x620")
+                    app.update()
+                    assert app.scroll_canvas.winfo_width() > 400
+                    app.geometry("1400x900")
+                    app.update()
+                    app.clear_fields()
+                    assert app.summary["person"].get() == "Nog invullen"
                 finally:
                     app.destroy()
         except Exception:

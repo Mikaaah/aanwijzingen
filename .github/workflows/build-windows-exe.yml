@@ -51,6 +51,34 @@ jobs:
             throw "Het venster kon niet starten (exitcode $($process.ExitCode))."
           }
 
+      - name: Leg een schermafbeelding van het venster vast
+        shell: pwsh
+        run: |
+          try {
+            Add-Type -AssemblyName System.Windows.Forms
+            Add-Type -AssemblyName System.Drawing
+            $app = Start-Process -FilePath .\dist\NEN3140_Aanwijzingen.exe -PassThru
+            Start-Sleep -Seconds 4
+            $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bitmap = [System.Drawing.Bitmap]::new($bounds.Width, $bounds.Height)
+            $drawing = [System.Drawing.Graphics]::FromImage($bitmap)
+            $drawing.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+            $bitmap.Save('ui-preview.png')
+            $drawing.Dispose()
+            $bitmap.Dispose()
+          } catch {
+            Write-Host "Schermafbeelding niet beschikbaar: $_"
+          } finally {
+            if ($app) { Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue }
+          }
+
+      - name: Maak de schermafbeelding downloadbaar
+        uses: actions/upload-artifact@v4
+        with:
+          name: interface-controle
+          path: ui-preview.png
+          if-no-files-found: ignore
+
       - name: Maak exe downloadbaar
         uses: actions/upload-artifact@v4
         with:
