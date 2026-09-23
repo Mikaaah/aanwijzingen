@@ -12,8 +12,8 @@ import traceback
 from config import APP_TITLE, DATE_FIELDS, SECTIONS, TYPES, document_values, template_path, resource_path
 from document_generator import TemplateError, _all_paragraphs, export_pdf, generate_docx
 from ui_components import (ActionButton, BACKGROUND, BORDER, Card, DARK, ERROR,
-                           INK, InputBox, MUTED, NavItem, SelectBox, WHITE, YELLOW,
-                           rounded_rect)
+                           INK, InputBox, MUTED, NavItem, SelectBox, SIDEBAR,
+                           SURFACE, SummaryTile, WHITE, YELLOW, rounded_rect)
 
 
 SECTION_TIPS = {
@@ -88,47 +88,46 @@ class Application(tk.Tk):
         main = tk.Frame(self, bg=BACKGROUND)
         main.pack(side="left", fill="both", expand=True)
 
-        heading = tk.Frame(main, bg=BACKGROUND, padx=30, pady=15)
+        heading = tk.Frame(main, bg=BACKGROUND, padx=30, pady=19)
         heading.pack(fill="x")
-        tk.Label(heading, text="Aanwijzing aanmaken", font=("Segoe UI", 21, "bold"),
+        tk.Label(heading, text="EQRAFT  /  NEN 3140", font=("Arial", 9, "bold"),
+                 bg=BACKGROUND, fg="#6A6040").pack(anchor="w", pady=(0, 7))
+        tk.Label(heading, text="Aanwijzing aanmaken", font=("Arial", 21, "bold"),
                  bg=BACKGROUND, fg=INK).pack(anchor="w")
         tk.Label(heading, text="Leg de aanwijzing duidelijk vast en maak daarna het Word-document.",
-                 font=("Segoe UI", 10), bg=BACKGROUND, fg=MUTED).pack(anchor="w", pady=(4, 0))
+                 font=("Arial", 10), bg=BACKGROUND, fg=MUTED).pack(anchor="w", pady=(4, 0))
 
-        overview = Card(main, padding=14)
-        overview.pack(fill="x", padx=28, pady=(0, 12))
+        overview = Card(main, padding=17)
+        overview.pack(fill="x", padx=28, pady=(0, 16))
         top = overview.body
-        tk.Label(top, text="HUIDIGE AANWIJZING", bg=WHITE, fg=MUTED,
-                 font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(0, 8))
-        grid = tk.Frame(top, bg=WHITE)
+        tk.Label(top, text="HUIDIGE AANWIJZING", bg=SURFACE, fg=INK,
+                 font=("Arial", 10, "bold")).pack(anchor="w", pady=(0, 12))
+        grid = tk.Frame(top, bg=SURFACE)
         grid.pack(fill="x")
-        for col, (key, label) in enumerate((
+        self.summary_grid = grid
+        self.summary_tiles = []
+        for key, label in (
             ("person", "PERSOON"), ("role", "TYPE"),
             ("location", "LOCATIE"), ("authority", "BEVOEGDHEDEN")
-        )):
-            grid.columnconfigure(col, weight=1, uniform="overview")
-            section = tk.Frame(grid, bg=WHITE)
-            section.grid(row=0, column=col, sticky="ew", padx=(0, 9))
-            tk.Label(section, text=label, font=("Segoe UI", 8, "bold"),
-                     bg=WHITE, fg=MUTED).pack(anchor="w")
-            value = tk.Label(section, textvariable=self.summary[key], bg=WHITE, fg=INK,
-                             font=("Segoe UI", 10, "bold"), anchor="w")
-            value.pack(anchor="w", pady=(4, 0), fill="x")
-        tk.Frame(top, bg=BORDER, height=1).pack(fill="x", pady=(10, 7))
-        tk.Label(top, textvariable=self.summary_status, bg=WHITE, fg=INK,
-                 font=("Segoe UI", 9)).pack(anchor="w")
+        ):
+            self.summary_tiles.append(SummaryTile(grid, label, self.summary[key]))
+        self._layout_summary(4)
+        grid.bind("<Configure>", self._summary_resized)
+        tk.Frame(top, bg=BORDER, height=1).pack(fill="x", pady=(14, 10))
+        tk.Label(top, textvariable=self.summary_status, bg=SURFACE, fg=INK,
+                 font=("Arial", 9)).pack(anchor="w")
 
-        action_bar = tk.Frame(main, bg=WHITE, padx=28, pady=13)
+        action_bar = tk.Frame(main, bg=SURFACE, padx=28, pady=12)
         action_bar.pack(side="bottom", fill="x")
         tk.Frame(action_bar, bg=BORDER, height=1).pack(side="top", fill="x", pady=(0, 10))
-        actions = tk.Frame(action_bar, bg=WHITE)
+        actions = tk.Frame(action_bar, bg=SURFACE)
         actions.pack(fill="x")
         self.primary_button = ActionButton(actions, "Document maken", self.create_document,
                                            primary=True, width=183)
         self.primary_button.pack(side="right", padx=(10, 0))
         ActionButton(actions, "Velden wissen", self.clear_fields, width=142).pack(side="right")
-        tk.Label(actions, textvariable=self.progress_text, bg=WHITE, fg=MUTED,
-                 font=("Segoe UI", 9)).pack(side="left")
+        tk.Label(actions, textvariable=self.progress_text, bg=SURFACE, fg=MUTED,
+                 font=("Arial", 9)).pack(side="left")
 
         area = tk.Frame(main, bg=BACKGROUND)
         area.pack(fill="both", expand=True, padx=(28, 18))
@@ -146,30 +145,30 @@ class Application(tk.Tk):
         canvas.bind_all("<Button-4>", lambda _e: canvas.yview_scroll(-1, "units"))
         canvas.bind_all("<Button-5>", lambda _e: canvas.yview_scroll(1, "units"))
 
-        role_card = Card(content, padding=18)
-        role_card.pack(fill="x", pady=(0, 16))
-        tk.Label(role_card.body, text="01  Type aanwijzing", bg=WHITE, fg=INK,
-                 font=("Segoe UI", 13, "bold")).pack(anchor="w")
+        role_card = Card(content, padding=24)
+        role_card.pack(fill="x", pady=(0, 18))
+        tk.Label(role_card.body, text="01  Type aanwijzing", bg=SURFACE, fg=INK,
+                 font=("Arial", 13, "bold")).pack(anchor="w")
         tk.Label(role_card.body, text="Kies de rol. De bijbehorende verantwoordelijkheden worden automatisch ingevuld.",
-                 bg=WHITE, fg=MUTED, font=("Segoe UI", 9),
+                 bg=SURFACE, fg=MUTED, font=("Arial", 9),
                  wraplength=720, justify="left").pack(anchor="w", pady=(4, 11))
         selection = SelectBox(role_card.body, self.type_var, list(TYPES))
         selection.pack(fill="x")
         self.role_note = tk.Label(role_card.body, textvariable=self.role_preview,
-                                  bg=WHITE, fg=MUTED, font=("Segoe UI", 9),
+                                  bg=SURFACE, fg=MUTED, font=("Arial", 9),
                                   anchor="w", justify="left", wraplength=700)
         self.role_note.pack(fill="x", pady=(9, 0))
 
         for number, (section_name, fields) in enumerate(SECTIONS, start=2):
             card = Card(content)
-            card.pack(fill="x", pady=(0, 16))
+            card.pack(fill="x", pady=(0, 18))
             body = card.body
-            tk.Label(body, text=f"{number:02d}  {section_name}", bg=WHITE, fg=INK,
-                     font=("Segoe UI", 13, "bold")).pack(anchor="w")
-            tk.Label(body, text=SECTION_TIPS[section_name], bg=WHITE, fg=MUTED,
-                     font=("Segoe UI", 9), wraplength=720,
-                     justify="left").pack(anchor="w", pady=(3, 18))
-            fields_grid = tk.Frame(body, bg=WHITE)
+            tk.Label(body, text=f"{number:02d}  {section_name}", bg=SURFACE, fg=INK,
+                     font=("Arial", 13, "bold")).pack(anchor="w")
+            tk.Label(body, text=SECTION_TIPS[section_name], bg=SURFACE, fg=MUTED,
+                     font=("Arial", 9), wraplength=720,
+                     justify="left").pack(anchor="w", pady=(5, 19))
+            fields_grid = tk.Frame(body, bg=SURFACE)
             fields_grid.pack(fill="x")
             fields_grid.columnconfigure(0, weight=1, uniform="fields")
             fields_grid.columnconfigure(1, weight=1, uniform="fields")
@@ -177,12 +176,12 @@ class Application(tk.Tk):
             for label, key, required, multiline in fields:
                 if multiline and col:
                     row, col = row + 1, 0
-                field = tk.Frame(fields_grid, bg=WHITE)
+                field = tk.Frame(fields_grid, bg=SURFACE)
                 field.grid(row=row, column=0 if multiline else col,
                            columnspan=2 if multiline else 1, sticky="ew",
-                           padx=(0, 0 if multiline or col else 16), pady=(0, 15))
-                label_widget = tk.Label(field, text=label, bg=WHITE, fg=INK,
-                                        font=("Segoe UI", 9, "bold"), anchor="w",
+                           padx=(0, 0 if multiline or col else 18), pady=(0, 18))
+                label_widget = tk.Label(field, text=label, bg=SURFACE, fg=INK,
+                                        font=("Arial", 9, "bold"), anchor="w",
                                         wraplength=260, justify="left")
                 label_widget.pack(anchor="w", pady=(0, 7))
                 field.bind("<Configure>", lambda e, target=label_widget:
@@ -194,8 +193,8 @@ class Application(tk.Tk):
                 self.field_frames[key] = wrapper
                 self.widgets[key] = wrapper.widget
                 if key in FIELD_TIPS:
-                    tk.Label(field, text=FIELD_TIPS[key], bg=WHITE, fg=MUTED,
-                             font=("Segoe UI", 8), wraplength=710,
+                    tk.Label(field, text=FIELD_TIPS[key], bg=SURFACE, fg=MUTED,
+                             font=("Arial", 8), wraplength=710,
                              justify="left").pack(anchor="w", pady=(5, 0))
                 if multiline:
                     row += 1
@@ -205,35 +204,63 @@ class Application(tk.Tk):
                     col = 1
 
     def _build_sidebar(self):
-        sidebar = tk.Frame(self, bg=DARK, width=222)
-        sidebar.pack(side="left", fill="y")
-        sidebar.pack_propagate(False)
+        sidebar_canvas = tk.Canvas(self, bg=BACKGROUND, width=236,
+                                   highlightthickness=0, borderwidth=0)
+        sidebar_canvas.pack(side="left", fill="y", padx=(12, 0), pady=12)
+        sidebar = tk.Frame(sidebar_canvas, bg=SIDEBAR)
+        sidebar_window = sidebar_canvas.create_window(14, 14, anchor="nw", window=sidebar)
+
+        def draw_sidebar(event):
+            sidebar_canvas.delete("sidebar_shape")
+            rounded_rect(sidebar_canvas, 0, 0, event.width, event.height, 18, SIDEBAR)
+            for item in sidebar_canvas.find_all():
+                if item != sidebar_window:
+                    sidebar_canvas.addtag_withtag("sidebar_shape", item)
+            sidebar_canvas.tag_lower("sidebar_shape", sidebar_window)
+            sidebar_canvas.itemconfigure(sidebar_window, width=max(1, event.width - 28),
+                                         height=max(1, event.height - 28))
+
+        sidebar_canvas.bind("<Configure>", draw_sidebar)
         logo = resource_path("assets/eqraft_logo_sidebar.png")
         if logo.is_file():
             try:
                 self.logo_image = tk.PhotoImage(file=str(logo))
-                logo_card = tk.Canvas(sidebar, width=192, height=82, bg=DARK,
+                logo_card = tk.Canvas(sidebar, width=192, height=80, bg=SIDEBAR,
                                       highlightthickness=0, borderwidth=0)
-                rounded_rect(logo_card, 0, 0, 192, 82, 11, WHITE)
-                logo_card.create_image(96, 41, image=self.logo_image)
-                logo_card.pack(anchor="w", padx=15, pady=(24, 20))
+                rounded_rect(logo_card, 0, 0, 192, 80, 12, WHITE)
+                logo_card.create_image(96, 40, image=self.logo_image)
+                logo_card.pack(anchor="w", padx=8, pady=(12, 29))
             except tk.TclError:
                 pass
         if self.logo_image is None:
-            tk.Label(sidebar, text="EQRAFT", bg=DARK, fg=WHITE,
-                     font=("Segoe UI", 19, "bold")).pack(anchor="w", padx=24, pady=(30, 28))
-        tk.Label(sidebar, text="WERKOMGEVING", bg=DARK, fg="#8C9199",
-                 font=("Segoe UI", 8, "bold")).pack(anchor="w", padx=24, pady=(0, 12))
+            tk.Label(sidebar, text="EQRAFT", bg=SIDEBAR, fg=INK,
+                     font=("Arial", 19, "bold")).pack(anchor="w", padx=18, pady=(30, 28))
+        tk.Label(sidebar, text="WERKOMGEVING", bg=SIDEBAR, fg="#51491D",
+                 font=("Arial", 8, "bold")).pack(anchor="w", padx=17, pady=(0, 13))
         NavItem(sidebar, "Aanwijzing maken", lambda: self.scroll_canvas.yview_moveto(0),
-                selected=True).pack(fill="x", padx=13, pady=(0, 6))
-        NavItem(sidebar, "Uitleg en werkwijze", self._show_guide).pack(fill="x", padx=13)
+                selected=True).pack(fill="x", padx=6, pady=(0, 7))
+        NavItem(sidebar, "Uitleg en werkwijze", self._show_guide).pack(fill="x", padx=6)
 
-        bottom = tk.Frame(sidebar, bg=DARK)
-        bottom.pack(side="bottom", fill="x", padx=18, pady=22)
-        tk.Frame(bottom, bg="#34373C", height=1).pack(fill="x", pady=(0, 12))
+        bottom = tk.Frame(sidebar, bg=SIDEBAR)
+        bottom.pack(side="bottom", fill="x", padx=7, pady=(0, 12))
+        tk.Frame(bottom, bg="#D3BB40", height=1).pack(fill="x", padx=8, pady=(0, 12))
         NavItem(bottom, "Afsluiten", self.destroy).pack(fill="x")
-        tk.Label(bottom, text="NEN 3140  ·  EQRAFT", bg=DARK, fg="#898F96",
-                 font=("Segoe UI", 8)).pack(anchor="w", padx=12, pady=(12, 0))
+        tk.Label(bottom, text="NEN 3140  ·  EQRAFT", bg=SIDEBAR, fg="#51491D",
+                 font=("Arial", 8)).pack(anchor="w", padx=16, pady=(14, 0))
+
+    def _layout_summary(self, columns):
+        for col in range(4):
+            self.summary_grid.columnconfigure(col, weight=1 if col < columns else 0,
+                                              uniform="summary" if col < columns else "")
+        for index, tile in enumerate(self.summary_tiles):
+            tile.grid(row=index // columns, column=index % columns,
+                      sticky="ew", padx=(0, 8), pady=(0, 8))
+        self.summary_columns = columns
+
+    def _summary_resized(self, event):
+        columns = 4 if event.width >= 690 else 2
+        if columns != self.summary_columns:
+            self._layout_summary(columns)
 
     def _resize_scroll_content(self, event):
         width = max(1, min(900, event.width - 12))
@@ -324,11 +351,11 @@ class Application(tk.Tk):
                         f"+{self.winfo_rooty() + max(0, (self.winfo_height() - dialog.winfo_height()) // 2)}")
         card = Card(dialog, padding=24, expand=True)
         card.pack(fill="both", expand=True, padx=15, pady=15)
-        tk.Label(card.body, text=title, bg=WHITE, fg=INK,
-                 font=("Segoe UI", 15, "bold")).pack(anchor="w", pady=(0, 13))
-        label = tk.Label(card.body, text=message, bg=WHITE,
+        tk.Label(card.body, text=title, bg=SURFACE, fg=INK,
+                 font=("Arial", 15, "bold")).pack(anchor="w", pady=(0, 13))
+        label = tk.Label(card.body, text=message, bg=SURFACE,
                          fg=ERROR if kind == "error" else INK,
-                         font=("Segoe UI", 10), wraplength=430,
+                         font=("Arial", 10), wraplength=430,
                          justify="left", anchor="nw")
         label.pack(fill="x", pady=(0, 15))
         result = {"value": False}
@@ -338,7 +365,7 @@ class Application(tk.Tk):
             dialog.grab_release()
             dialog.destroy()
 
-        buttons = tk.Frame(card.body, bg=WHITE)
+        buttons = tk.Frame(card.body, bg=SURFACE)
         buttons.pack(side="bottom", anchor="e", fill="x")
         if confirm:
             ActionButton(buttons, "Nee, behouden", lambda: close(False),

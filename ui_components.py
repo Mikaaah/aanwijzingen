@@ -4,13 +4,15 @@ import tkinter as tk
 from tkinter import ttk
 
 
-BACKGROUND = "#F3F4F6"
+BACKGROUND = "#E9EAEC"
+SURFACE = "#FAFAF9"
 WHITE = "#FFFFFF"
-DARK = "#161719"
-INK = "#17191C"
-MUTED = "#6B7078"
-BORDER = "#E1E4E8"
-YELLOW = "#FFDD00"
+DARK = "#28292A"
+SIDEBAR = "#F4DE58"
+INK = "#1C1C1C"
+MUTED = "#555C63"
+BORDER = "#C8CBD0"
+YELLOW = "#FFDE00"
 ERROR = "#CC5757"
 
 
@@ -28,12 +30,12 @@ def rounded_rect(canvas, left, top, right, bottom, radius, color):
 class Card(tk.Canvas):
     """Een kaart met afgeronde hoeken die meegroeit met de inhoud."""
 
-    def __init__(self, parent, padding=22, expand=False, **kwargs):
+    def __init__(self, parent, padding=24, expand=False, **kwargs):
         super().__init__(parent, bg=BACKGROUND, highlightthickness=0,
                          borderwidth=0, height=50, **kwargs)
         self.padding = padding
         self.expand = expand
-        self.body = tk.Frame(self, bg=WHITE)
+        self.body = tk.Frame(self, bg=SURFACE)
         self.window = self.create_window(padding, padding, window=self.body, anchor="nw")
         self.bind("<Configure>", self._resize)
         self.body.bind("<Configure>", self._content_changed)
@@ -58,8 +60,8 @@ class Card(tk.Canvas):
         if width <= 3 or height <= 3:
             return
         self.delete("shape")
-        rounded_rect(self, 2, 2, width - 1, height - 1, 14, BORDER)
-        rounded_rect(self, 2, 1, width - 2, height - 2, 14, WHITE)
+        rounded_rect(self, 2, 2, width - 1, height - 1, 16, BORDER)
+        rounded_rect(self, 3, 3, width - 2, height - 2, 15, SURFACE)
         for item in self.find_all():
             if item != self.window:
                 self.addtag_withtag("shape", item)
@@ -70,17 +72,17 @@ class InputBox(tk.Canvas):
     """Afgeronde rand om een gewone, selecteerbare Tk-invoer."""
 
     def __init__(self, parent, multiline=False, on_change=None):
-        super().__init__(parent, bg=WHITE, highlightthickness=0, borderwidth=0,
-                         height=96 if multiline else 42)
+        super().__init__(parent, bg=SURFACE, highlightthickness=0, borderwidth=0,
+                         height=106 if multiline else 44)
         self.state = "normal"
         self.multiline = multiline
         if multiline:
             self.widget = tk.Text(self, height=3, wrap="word", bg=WHITE, fg=INK,
-                                  font=("Segoe UI", 10), relief="flat", borderwidth=0,
+                                  font=("Arial", 10), relief="flat", borderwidth=0,
                                   highlightthickness=0, padx=1, pady=1,
                                   insertbackground=INK, undo=True)
         else:
-            self.widget = tk.Entry(self, bg=WHITE, fg=INK, font=("Segoe UI", 10),
+            self.widget = tk.Entry(self, bg=WHITE, fg=INK, font=("Arial", 10),
                                    relief="flat", borderwidth=0, highlightthickness=0,
                                    insertbackground=INK)
         self.window = self.create_window(13, 10, anchor="nw", window=self.widget)
@@ -116,9 +118,9 @@ class InputBox(tk.Canvas):
         if width <= 3 or height <= 3:
             return
         self.delete("shape")
-        color = {"normal": BORDER, "focus": "#C7A900", "error": ERROR}[self.state]
+        color = {"normal": "#AEB3BA", "focus": "#B99B00", "error": ERROR}[self.state]
         rounded_rect(self, 0, 0, width, height, 9, color)
-        rounded_rect(self, 1.5, 1.5, width - 1.5, height - 1.5, 8, WHITE)
+        rounded_rect(self, 2, 2, width - 2, height - 2, 8, WHITE)
         for item in self.find_all():
             if item != self.window:
                 self.addtag_withtag("shape", item)
@@ -127,17 +129,17 @@ class InputBox(tk.Canvas):
 
 class SelectBox(tk.Canvas):
     def __init__(self, parent, variable, options, style="Eq.Flat.TCombobox"):
-        super().__init__(parent, bg=WHITE, highlightthickness=0, height=42)
+        super().__init__(parent, bg=SURFACE, highlightthickness=0, height=44)
         self.combo = ttk.Combobox(self, textvariable=variable, values=options,
                                   state="readonly", style=style,
-                                  font=("Segoe UI", 10))
+                                  font=("Arial", 10))
         self.window = self.create_window(9, 8, anchor="nw", window=self.combo)
         self.bind("<Configure>", self._resize)
 
     def _resize(self, event):
         self.delete("shape")
-        rounded_rect(self, 0, 0, event.width, event.height, 9, BORDER)
-        rounded_rect(self, 1, 1, event.width - 1, event.height - 1, 8, WHITE)
+        rounded_rect(self, 0, 0, event.width, event.height, 9, "#AEB3BA")
+        rounded_rect(self, 2, 2, event.width - 2, event.height - 2, 8, WHITE)
         for item in self.find_all():
             if item != self.window:
                 self.addtag_withtag("shape", item)
@@ -147,8 +149,8 @@ class SelectBox(tk.Canvas):
 
 
 class ActionButton(tk.Canvas):
-    def __init__(self, parent, text, command, primary=False, width=148):
-        super().__init__(parent, width=width, height=44, bg=WHITE,
+    def __init__(self, parent, text, command, primary=False, width=148, background=SURFACE):
+        super().__init__(parent, width=width, height=46, bg=background,
                          highlightthickness=0, takefocus=1, cursor="hand2")
         self.text, self.command, self.primary = text, command, primary
         self.hover = False
@@ -175,16 +177,16 @@ class ActionButton(tk.Canvas):
         w, h = self.winfo_width(), self.winfo_height()
         if w <= 1:
             w, h = int(self.cget("width")), int(self.cget("height"))
-        base = ("#F1D100" if self.hover else YELLOW) if self.primary else ("#F2F3F5" if self.hover else WHITE)
-        rounded_rect(self, 0, 0, w, h, 9, BORDER if not self.primary else base)
-        rounded_rect(self, 1, 1, w - 1, h - 1, 8, base)
+        base = ("#E9CA00" if self.hover else YELLOW) if self.primary else ("#F0F1F2" if self.hover else WHITE)
+        rounded_rect(self, 0, 0, w, h, 11, BORDER if not self.primary else base)
+        rounded_rect(self, 2, 2, w - 2, h - 2, 10, base)
         self.create_text(w / 2, h / 2, text=self.text, fill=INK,
-                         font=("Segoe UI", 10, "bold" if self.primary else "normal"))
+                         font=("Arial", 10, "bold"))
 
 
 class NavItem(tk.Canvas):
     def __init__(self, parent, text, command, selected=False):
-        super().__init__(parent, width=192, height=43, bg=DARK,
+        super().__init__(parent, width=192, height=47, bg=SIDEBAR,
                          highlightthickness=0, cursor="hand2", takefocus=1)
         self.text, self.command, self.selected, self.hover = text, command, selected, False
         self.bind("<Configure>", lambda _e: self._draw())
@@ -207,11 +209,37 @@ class NavItem(tk.Canvas):
         self.delete("all")
         w = self.winfo_width() if self.winfo_width() > 1 else 192
         if self.selected or self.hover:
-            rounded_rect(self, 0, 0, w, 43, 9, "#292B2F" if self.selected else "#24262A")
+            rounded_rect(self, 0, 0, w, 47, 11, DARK if self.selected else "#FFE98A")
         if self.selected:
-            rounded_rect(self, 0, 8, 3, 35, 1, YELLOW)
-        self.create_text(18, 21, text="•", anchor="w", fill=YELLOW if self.selected else "#969BA2",
-                         font=("Segoe UI", 14))
-        self.create_text(36, 22, text=self.text, anchor="w",
-                         fill=WHITE if self.selected else "#BFC3C9",
-                         font=("Segoe UI", 10, "bold" if self.selected else "normal"))
+            rounded_rect(self, 7, 13, 11, 34, 2, YELLOW)
+        self.create_text(20, 23, text="•", anchor="w", fill=YELLOW if self.selected else DARK,
+                         font=("Arial", 13, "bold"))
+        self.create_text(38, 24, text=self.text, anchor="w",
+                         fill=WHITE if self.selected else INK,
+                         font=("Arial", 10, "bold" if self.selected else "normal"))
+
+
+class SummaryTile(tk.Canvas):
+    """Compact overzichtsvak met eigen afgeronde achtergrond."""
+
+    def __init__(self, parent, label, variable):
+        super().__init__(parent, bg=SURFACE, height=70, highlightthickness=0)
+        content = tk.Frame(self, bg="#F0F1F1")
+        tk.Label(content, text=label, bg="#F0F1F1", fg=MUTED,
+                 font=("Arial", 8, "bold")).pack(anchor="w")
+        value = tk.Label(content, textvariable=variable, bg="#F0F1F1", fg=INK,
+                         font=("Arial", 10, "bold"), anchor="w", justify="left")
+        value.pack(fill="x", pady=(5, 0))
+        self.window = self.create_window(12, 12, window=content, anchor="nw")
+        self.bind("<Configure>", self._resize)
+
+    def _resize(self, event):
+        width, height = event.width, event.height
+        self.delete("tile_shape")
+        rounded_rect(self, 0, 0, width, height, 11, BORDER)
+        rounded_rect(self, 1.5, 1.5, width - 1.5, height - 1.5, 10, "#F0F1F1")
+        for item in self.find_all():
+            if item != self.window:
+                self.addtag_withtag("tile_shape", item)
+        self.tag_lower("tile_shape", self.window)
+        self.itemconfigure(self.window, width=max(1, width - 24), height=max(1, height - 20))
