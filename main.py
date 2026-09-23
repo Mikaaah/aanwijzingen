@@ -225,11 +225,9 @@ class Application(tk.Tk):
         if logo.is_file():
             try:
                 self.logo_image = tk.PhotoImage(file=str(logo))
-                logo_card = tk.Canvas(sidebar, width=192, height=80, bg=SIDEBAR,
-                                      highlightthickness=0, borderwidth=0)
-                rounded_rect(logo_card, 0, 0, 192, 80, 12, WHITE)
-                logo_card.create_image(96, 40, image=self.logo_image)
-                logo_card.pack(anchor="w", padx=8, pady=(12, 29))
+                tk.Label(sidebar, image=self.logo_image, bg=SIDEBAR,
+                         borderwidth=0, highlightthickness=0).pack(
+                             anchor="w", padx=14, pady=(18, 29))
             except tk.TclError:
                 pass
         if self.logo_image is None:
