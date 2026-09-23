@@ -33,7 +33,7 @@ NEN3140_Aanwijzingen/
 ├── .github/workflows/build-windows-exe.yml
 ├── assets/
 │   ├── eqraft_logo.png
-│   ├── eqraft_logo_light.png
+│   ├── eqraft_logo_sidebar.png
 │   ├── eqraft_icon.png
 │   └── eqraft_icon.ico
 ├── templates/

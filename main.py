@@ -12,7 +12,8 @@ import traceback
 from config import APP_TITLE, DATE_FIELDS, SECTIONS, TYPES, document_values, template_path, resource_path
 from document_generator import TemplateError, _all_paragraphs, export_pdf, generate_docx
 from ui_components import (ActionButton, BACKGROUND, BORDER, Card, DARK, ERROR,
-                           INK, InputBox, MUTED, NavItem, SelectBox, WHITE, YELLOW)
+                           INK, InputBox, MUTED, NavItem, SelectBox, WHITE, YELLOW,
+                           rounded_rect)
 
 
 SECTION_TIPS = {
@@ -207,11 +208,15 @@ class Application(tk.Tk):
         sidebar = tk.Frame(self, bg=DARK, width=222)
         sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
-        logo = resource_path("assets/eqraft_logo_light.png")
+        logo = resource_path("assets/eqraft_logo_sidebar.png")
         if logo.is_file():
             try:
                 self.logo_image = tk.PhotoImage(file=str(logo))
-                tk.Label(sidebar, image=self.logo_image, bg=DARK).pack(anchor="w", padx=20, pady=(25, 24))
+                logo_card = tk.Canvas(sidebar, width=192, height=82, bg=DARK,
+                                      highlightthickness=0, borderwidth=0)
+                rounded_rect(logo_card, 0, 0, 192, 82, 11, WHITE)
+                logo_card.create_image(96, 41, image=self.logo_image)
+                logo_card.pack(anchor="w", padx=15, pady=(24, 20))
             except tk.TclError:
                 pass
         if self.logo_image is None:
