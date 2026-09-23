@@ -3,9 +3,11 @@
 from datetime import datetime
 from pathlib import Path
 import re
+import sys
 import tempfile
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+import traceback
 
 from config import APP_TITLE, DATE_FIELDS, SECTIONS, TYPES, template_path
 from document_generator import TemplateError, export_pdf, generate_docx
@@ -157,5 +159,38 @@ class Application(tk.Tk):
             messagebox.showerror("Document niet gemaakt", f"Er is iets misgegaan:\n{exc}")
 
 
+def self_test():
+    """Controleren dat de ingebundelde code en het sjabloon echt samenwerken."""
+    template = template_path(TYPES["Installatieverantwoordelijke (IV)"]["template"])
+    values = {key: "CONTROLE" for _heading, fields in SECTIONS
+              for _label, key, _required, _multi in fields}
+    values.update(INGANGSDATUM="01-01-2026", GELDIG_TOT="01-01-2027",
+                  DATUM_AANWIJZER="01-01-2026", DATUM_AANGEWEZENE="01-01-2026")
+    with tempfile.TemporaryDirectory() as folder:
+        result = Path(folder) / "controle.docx"
+        generate_docx(template, result, values)
+        if result.stat().st_size < 1000:
+            raise RuntimeError("Het gemaakte Word-document is niet geldig.")
+
+
+def start():
+    if sys.argv[1:] == ["--self-test"]:
+        try:
+            self_test()
+        except Exception:
+            log = Path(tempfile.gettempdir()) / "NEN3140_Aanwijzingen_fout.txt"
+            log.write_text(traceback.format_exc(), encoding="utf-8")
+            sys.exit(1)
+        return
+    try:
+        Application().mainloop()
+    except Exception:
+        log = Path(tempfile.gettempdir()) / "NEN3140_Aanwijzingen_fout.txt"
+        log.write_text(traceback.format_exc(), encoding="utf-8")
+        # Werkt ook bij een executable zonder consolevenster.
+        messagebox.showerror(APP_TITLE, f"Het programma kon niet starten.\n\nDetails: {log}")
+        sys.exit(1)
+
+
 if __name__ == "__main__":
-    Application().mainloop()
+    start()
