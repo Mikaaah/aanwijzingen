@@ -48,6 +48,8 @@ jobs:
         run: |
           $process = Start-Process -FilePath .\dist\NEN3140_Aanwijzingen.exe -ArgumentList '--ui-smoke-test' -PassThru -Wait
           if ($process.ExitCode -ne 0) {
+            $errorFile = Join-Path $env:TEMP 'NEN3140_Aanwijzingen_fout.txt'
+            if (Test-Path $errorFile) { Get-Content $errorFile }
             throw "Het venster kon niet starten (exitcode $($process.ExitCode))."
           }
 
