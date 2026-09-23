@@ -258,7 +258,7 @@ class Application(tk.Tk):
         self.summary_columns = columns
 
     def _summary_resized(self, event):
-        columns = 4 if event.width >= 690 else 2
+        columns = 4 if event.width >= 590 else 2
         if columns != self.summary_columns:
             self._layout_summary(columns)
 

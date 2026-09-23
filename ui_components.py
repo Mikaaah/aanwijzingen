@@ -130,22 +130,36 @@ class InputBox(tk.Canvas):
 class SelectBox(tk.Canvas):
     def __init__(self, parent, variable, options, style="Eq.Flat.TCombobox"):
         super().__init__(parent, bg=SURFACE, highlightthickness=0, height=44)
+        self.focused = False
         self.combo = ttk.Combobox(self, textvariable=variable, values=options,
                                   state="readonly", style=style,
                                   font=("Arial", 10))
         self.window = self.create_window(9, 8, anchor="nw", window=self.combo)
         self.bind("<Configure>", self._resize)
+        self.combo.bind("<FocusIn>", lambda _event: self._set_focus(True), add="+")
+        self.combo.bind("<FocusOut>", lambda _event: self._set_focus(False), add="+")
+
+    def _set_focus(self, focused):
+        self.focused = focused
+        self._draw()
 
     def _resize(self, event):
+        self.itemconfigure(self.window, width=max(1, event.width - 18),
+                           height=max(1, event.height - 16))
+        self._draw()
+
+    def _draw(self):
         self.delete("shape")
-        rounded_rect(self, 0, 0, event.width, event.height, 9, "#AEB3BA")
-        rounded_rect(self, 2, 2, event.width - 2, event.height - 2, 8, WHITE)
+        width, height = self.winfo_width(), self.winfo_height()
+        if width <= 3 or height <= 3:
+            return
+        rounded_rect(self, 0, 0, width, height, 9,
+                     "#B99B00" if self.focused else "#AEB3BA")
+        rounded_rect(self, 2, 2, width - 2, height - 2, 8, WHITE)
         for item in self.find_all():
             if item != self.window:
                 self.addtag_withtag("shape", item)
         self.tag_lower("shape", self.window)
-        self.itemconfigure(self.window, width=max(1, event.width - 18),
-                           height=max(1, event.height - 16))
 
 
 class ActionButton(tk.Canvas):
