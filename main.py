@@ -47,8 +47,12 @@ class Application(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(APP_TITLE)
-        self.geometry("1180x840")
-        self.minsize(900, 620)
+        screen_width, screen_height = self.winfo_screenwidth(), self.winfo_screenheight()
+        width = min(1180, max(760, screen_width - 44))
+        height = min(840, max(540, screen_height - 90))
+        self.geometry(f"{width}x{height}+{max(0, (screen_width-width)//2)}"
+                      f"+{max(0, (screen_height-height-42)//2)}")
+        self.minsize(760, 540)
         self.configure(bg=BACKGROUND)
         self.widgets = {}
         self.field_labels = {}
@@ -118,8 +122,9 @@ class Application(tk.Tk):
         tk.Frame(action_bar, bg=BORDER, height=1).pack(side="top", fill="x", pady=(0, 10))
         actions = tk.Frame(action_bar, bg=WHITE)
         actions.pack(fill="x")
-        ActionButton(actions, "Document maken", self.create_document, primary=True,
-                     width=183).pack(side="right", padx=(10, 0))
+        self.primary_button = ActionButton(actions, "Document maken", self.create_document,
+                                           primary=True, width=183)
+        self.primary_button.pack(side="right", padx=(10, 0))
         ActionButton(actions, "Velden wissen", self.clear_fields, width=142).pack(side="right")
         tk.Label(actions, textvariable=self.progress_text, bg=WHITE, fg=MUTED,
                  font=("Segoe UI", 9)).pack(side="left")
@@ -176,8 +181,11 @@ class Application(tk.Tk):
                            columnspan=2 if multiline else 1, sticky="ew",
                            padx=(0, 0 if multiline or col else 16), pady=(0, 15))
                 label_widget = tk.Label(field, text=label, bg=WHITE, fg=INK,
-                                        font=("Segoe UI", 9, "bold"), anchor="w")
+                                        font=("Segoe UI", 9, "bold"), anchor="w",
+                                        wraplength=260, justify="left")
                 label_widget.pack(anchor="w", pady=(0, 7))
+                field.bind("<Configure>", lambda e, target=label_widget:
+                           target.configure(wraplength=max(160, e.width - 8)))
                 self.field_labels[key] = (label_widget, label, required)
                 wrapper = InputBox(field, multiline=multiline,
                                    on_change=lambda *_args, field_key=key: self._field_changed(field_key))
@@ -265,10 +273,14 @@ class Application(tk.Tk):
                 self.summary_status.set("Alle velden ingevuld · controleer de datums (dd-mm-jjjj).")
             else:
                 self.summary_status.set("Alle verplichte velden ingevuld · klaar voor controle en opslag.")
-        self.summary["person"].set(values["VOLLEDIGE_NAAM"] or "Nog invullen")
+        self.summary["person"].set(self._short(values["VOLLEDIGE_NAAM"]) or "Nog invullen")
         self.summary["role"].set(role["code"])
-        self.summary["location"].set(values["LOCATIE"] or "Nog invullen")
+        self.summary["location"].set(self._short(values["LOCATIE"]) or "Nog invullen")
         self.summary["authority"].set("Ingevuld" if values["BEVOEGDHEDEN"] else "Nog invullen")
+
+    @staticmethod
+    def _short(value, maximum=23):
+        return value if len(value) <= maximum else value[:maximum - 1] + "…"
 
     def _update_role(self, *_args):
         role = TYPES[self.type_var.get()]
@@ -486,6 +498,9 @@ def start():
                     app.geometry("900x620")
                     app.update()
                     assert app.scroll_canvas.winfo_width() > 400
+                    app.geometry("760x540")
+                    app.update()
+                    assert app.primary_button.winfo_rooty() + app.primary_button.winfo_height() < app.winfo_screenheight()
                     app.geometry("1400x900")
                     app.update()
                     app.clear_fields()
