@@ -88,20 +88,18 @@ class Application(tk.Tk):
         main = tk.Frame(self, bg=BACKGROUND)
         main.pack(side="left", fill="both", expand=True)
 
-        heading = tk.Frame(main, bg=BACKGROUND, padx=30, pady=19)
+        heading = tk.Frame(main, bg=BACKGROUND, padx=30, pady=11)
         heading.pack(fill="x")
-        tk.Label(heading, text="EQRAFT  /  NEN 3140", font=("Arial", 9, "bold"),
-                 bg=BACKGROUND, fg="#6A6040").pack(anchor="w", pady=(0, 7))
-        tk.Label(heading, text="Aanwijzing aanmaken", font=("Arial", 21, "bold"),
+        tk.Label(heading, text="Aanwijzing aanmaken", font=("Arial", 19, "bold"),
                  bg=BACKGROUND, fg=INK).pack(anchor="w")
         tk.Label(heading, text="Leg de aanwijzing duidelijk vast en maak daarna het Word-document.",
-                 font=("Arial", 10), bg=BACKGROUND, fg=MUTED).pack(anchor="w", pady=(4, 0))
+                 font=("Arial", 9), bg=BACKGROUND, fg=MUTED).pack(anchor="w", pady=(2, 0))
 
-        overview = Card(main, padding=17)
-        overview.pack(fill="x", padx=28, pady=(0, 16))
+        overview = Card(main, padding=11)
+        overview.pack(fill="x", padx=28, pady=(0, 10))
         top = overview.body
         tk.Label(top, text="HUIDIGE AANWIJZING", bg=SURFACE, fg=INK,
-                 font=("Arial", 10, "bold")).pack(anchor="w", pady=(0, 12))
+                 font=("Arial", 9, "bold")).pack(anchor="w", pady=(0, 6))
         grid = tk.Frame(top, bg=SURFACE)
         grid.pack(fill="x")
         self.summary_grid = grid
@@ -113,9 +111,8 @@ class Application(tk.Tk):
             self.summary_tiles.append(SummaryTile(grid, label, self.summary[key]))
         self._layout_summary(4)
         grid.bind("<Configure>", self._summary_resized)
-        tk.Frame(top, bg=BORDER, height=1).pack(fill="x", pady=(14, 10))
         tk.Label(top, textvariable=self.summary_status, bg=SURFACE, fg=INK,
-                 font=("Arial", 9)).pack(anchor="w")
+                 font=("Arial", 8)).pack(anchor="w", pady=(2, 0))
 
         action_bar = tk.Frame(main, bg=SURFACE, padx=28, pady=12)
         action_bar.pack(side="bottom", fill="x")
@@ -145,19 +142,19 @@ class Application(tk.Tk):
         canvas.bind_all("<Button-4>", lambda _e: canvas.yview_scroll(-1, "units"))
         canvas.bind_all("<Button-5>", lambda _e: canvas.yview_scroll(1, "units"))
 
-        role_card = Card(content, padding=24)
-        role_card.pack(fill="x", pady=(0, 18))
+        role_card = Card(content, padding=15)
+        role_card.pack(fill="x", pady=(0, 13))
         tk.Label(role_card.body, text="01  Type aanwijzing", bg=SURFACE, fg=INK,
                  font=("Arial", 13, "bold")).pack(anchor="w")
         tk.Label(role_card.body, text="Kies de rol. De bijbehorende verantwoordelijkheden worden automatisch ingevuld.",
                  bg=SURFACE, fg=MUTED, font=("Arial", 9),
-                 wraplength=720, justify="left").pack(anchor="w", pady=(4, 11))
+                 wraplength=720, justify="left").pack(anchor="w", pady=(2, 6))
         selection = SelectBox(role_card.body, self.type_var, list(TYPES))
         selection.pack(fill="x")
         self.role_note = tk.Label(role_card.body, textvariable=self.role_preview,
                                   bg=SURFACE, fg=MUTED, font=("Arial", 9),
                                   anchor="w", justify="left", wraplength=700)
-        self.role_note.pack(fill="x", pady=(9, 0))
+        self.role_note.pack(fill="x", pady=(6, 0))
 
         for number, (section_name, fields) in enumerate(SECTIONS, start=2):
             card = Card(content)
@@ -225,9 +222,15 @@ class Application(tk.Tk):
         if logo.is_file():
             try:
                 self.logo_image = tk.PhotoImage(file=str(logo))
-                tk.Label(sidebar, image=self.logo_image, bg=SIDEBAR,
-                         borderwidth=0, highlightthickness=0).pack(
-                             anchor="w", padx=14, pady=(18, 29))
+                logo_canvas = tk.Canvas(sidebar, width=180, height=62, bg=SIDEBAR,
+                                        highlightthickness=0, borderwidth=0)
+                # De witte binnenzijde van het beeldmerk is in de aangeleverde
+                # transparante PNG uitgespaard. Vul uitsluitend dat vlak in.
+                logo_canvas.create_polygon(30, 22, 50, 15, 50, 39,
+                                           40, 44, 40, 34, 30, 39,
+                                           fill=WHITE, outline="")
+                logo_canvas.create_image(0, 0, image=self.logo_image, anchor="nw")
+                logo_canvas.pack(anchor="w", padx=14, pady=(18, 24))
             except tk.TclError:
                 pass
         if self.logo_image is None:

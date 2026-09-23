@@ -60,8 +60,9 @@ class Card(tk.Canvas):
         if width <= 3 or height <= 3:
             return
         self.delete("shape")
-        rounded_rect(self, 2, 2, width - 1, height - 1, 16, BORDER)
-        rounded_rect(self, 3, 3, width - 2, height - 2, 15, SURFACE)
+        rounded_rect(self, 3, 5, width - 1, height - 1, 16, "#D1D4D8")
+        rounded_rect(self, 1, 1, width - 4, height - 4, 16, BORDER)
+        rounded_rect(self, 2, 2, width - 5, height - 5, 15, SURFACE)
         for item in self.find_all():
             if item != self.window:
                 self.addtag_withtag("shape", item)
@@ -237,23 +238,24 @@ class SummaryTile(tk.Canvas):
     """Compact overzichtsvak met eigen afgeronde achtergrond."""
 
     def __init__(self, parent, label, variable):
-        super().__init__(parent, bg=SURFACE, height=70, highlightthickness=0)
+        super().__init__(parent, bg=SURFACE, height=47, highlightthickness=0)
         content = tk.Frame(self, bg="#F0F1F1")
         tk.Label(content, text=label, bg="#F0F1F1", fg=MUTED,
-                 font=("Arial", 8, "bold")).pack(anchor="w")
+                 font=("Arial", 7, "bold")).pack(anchor="w")
         value = tk.Label(content, textvariable=variable, bg="#F0F1F1", fg=INK,
-                         font=("Arial", 10, "bold"), anchor="w", justify="left")
-        value.pack(fill="x", pady=(5, 0))
-        self.window = self.create_window(12, 12, window=content, anchor="nw")
+                         font=("Arial", 9, "bold"), anchor="w", justify="left")
+        value.pack(fill="x", pady=(1, 0))
+        self.window = self.create_window(10, 7, window=content, anchor="nw")
         self.bind("<Configure>", self._resize)
 
     def _resize(self, event):
         width, height = event.width, event.height
         self.delete("tile_shape")
-        rounded_rect(self, 0, 0, width, height, 11, BORDER)
-        rounded_rect(self, 1.5, 1.5, width - 1.5, height - 1.5, 10, "#F0F1F1")
+        rounded_rect(self, 1, 2, width, height, 10, "#D2D5D9")
+        rounded_rect(self, 0, 0, width - 1, height - 2, 10, BORDER)
+        rounded_rect(self, 1, 1, width - 2, height - 3, 9, "#F0F1F1")
         for item in self.find_all():
             if item != self.window:
                 self.addtag_withtag("tile_shape", item)
         self.tag_lower("tile_shape", self.window)
-        self.itemconfigure(self.window, width=max(1, width - 24), height=max(1, height - 20))
+        self.itemconfigure(self.window, width=max(1, width - 20), height=max(1, height - 12))
