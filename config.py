@@ -91,6 +91,27 @@ TYPES = {
         ),
         "required_fields": (),
     },
+    "ZZP'er (tijdelijke inhuur)": {
+        "code": "ZZP", "template": TEMPLATE_NAME,
+        "title": "Aanwijzing tijdelijke inhuur (zzp'er)",
+        "role": "ZZP'er (tijdelijke inhuur; geen elektrotechnische aanwijzing)",
+        "intro": (
+            "Dit document legt de tijdelijke inzet en de persoonlijk afgesproken werkzaamheden vast. "
+            "De status van zzp'er verleent op zichzelf geen elektrotechnische bevoegdheid."
+        ),
+        "responsibilities": (
+            "Alleen de hier vastgelegde taken binnen het afgesproken werkgebied uitvoeren.\n"
+            "De ontvangen instructies en veiligheidsafspraken opvolgen.\n"
+            "Afwijkingen en onveilige omstandigheden direct melden en het werk zo nodig stoppen.\n"
+            "Voor elektrotechnisch werk is daarnaast een passende, afzonderlijke NEN 3140-aanwijzing vereist."
+        ),
+        "authorities": (
+            "Uitsluitend de persoonlijk vastgelegde mechanische werkzaamheden en het "
+            "uitdrukkelijk geïnstrueerde normale gebruik. Deze registratie geeft geen toestemming "
+            "voor elektrotechnische werkzaamheden."
+        ),
+        "required_fields": ("COMBINATIES",),
+    },
 }
 
 SECTIONS = (
@@ -111,7 +132,7 @@ SECTIONS = (
     )),
     ("Bevoegdheden en grenzen", (
         ("Bevoegdheden / toegestane handelingen", "BEVOEGDHEDEN", True, True),
-        ("Persoonsgebonden bevoegdheidsregels", "COMBINATIES", False, True),
+        ("Bevoegdheden per machine", "COMBINATIES", False, True),
         ("Beperkingen / opmerkingen", "BEPERKINGEN", False, True),
     )),
     ("Namens de organisatie", (
@@ -142,7 +163,10 @@ def document_values(input_values: dict[str, str], role: dict) -> dict[str, str]:
     values = dict(input_values)
     values.update(
         DOCUMENTTITEL=role["title"], ROL=role["role"],
-        INLEIDING=role["intro"], VERANTWOORDELIJKHEDEN=role["responsibilities"],
+        INLEIDING=role["intro"],
+        VERANTWOORDELIJKHEDEN="\n".join(
+            "• " + line for line in role["responsibilities"].splitlines() if line.strip()
+        ),
         ROLBEVOEGDHEDEN=role["authorities"],
     )
     return values

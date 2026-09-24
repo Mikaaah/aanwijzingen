@@ -9,10 +9,12 @@ from ui_components import BACKGROUND, BORDER, INK, MUTED, SURFACE, WHITE, YELLOW
 
 class CatalogPicker(tk.Toplevel):
     def __init__(self, parent, store: CatalogStore, categories: tuple[str, ...],
-                 title: str, initial: set[str] | None = None, role_code: str = ""):
+                 title: str, initial: set[str] | None = None, role_code: str = "",
+                 manage_only: bool = False):
         super().__init__(parent)
         self.store, self.categories, self.chosen = store, categories, set(initial or ())
         self.role_code = role_code
+        self.manage_only = manage_only
         self.answer = None
         self.title(title)
         width = min(920, max(690, parent.winfo_screenwidth() - 100))
@@ -33,7 +35,9 @@ class CatalogPicker(tk.Toplevel):
         body = card.body
         tk.Label(body, text=title, bg=SURFACE, fg=INK,
                  font=("Arial", 16, "bold")).pack(anchor="w")
-        tk.Label(body, text="Klik op een regel om deze aan of uit te zetten. De uitleg staat rechts; code en benaming komen in het formulier.",
+        tk.Label(body, text=("Bekijk alle codes en hun uitleg. Voeg nieuwe codes toe of beheer je eigen aanvullingen."
+                             if self.manage_only else
+                             "Klik op een regel voor de uitleg; selecteer uitsluitend via het rondje links. Code en naam komen in het formulier."),
                  bg=SURFACE, fg=MUTED, font=("Arial", 9),
                  wraplength=760, justify="left").pack(anchor="w", pady=(4, 10))
 
@@ -53,7 +57,7 @@ class CatalogPicker(tk.Toplevel):
         listing.pack(side="left", fill="both", expand=True, padx=(0, 12))
         self.tree = ttk.Treeview(listing, columns=("check", "code", "name"), show="headings",
                                  selectmode="browse", height=14)
-        self.tree.heading("check", text="Kies")
+        self.tree.heading("check", text="" if self.manage_only else "Kies")
         self.tree.heading("code", text="Code")
         self.tree.heading("name", text="Benaming")
         self.tree.column("check", width=43, minwidth=43, stretch=False, anchor="center")
@@ -79,7 +83,9 @@ class CatalogPicker(tk.Toplevel):
                                wraplength=205, justify="left", anchor="nw")
         self.detail.pack(fill="x", pady=(12, 0))
 
-        tk.Label(body, text="Beschikbare codes zijn voorstellen; leg de toegestane taak, machine, procedure en voorwaarden per combinatie vast.",
+        tk.Label(body, text=("Vaste codes komen uit het aanwijzingsmodel. Eigen aanvullingen blijven bewaard voor deze gebruiker."
+                             if self.manage_only else
+                             "Beschikbare codes zijn voorstellen; leg de toegestane taken per machine persoonlijk vast."),
                  bg=SURFACE, fg=MUTED, font=("Arial", 9),
                  wraplength=780, justify="left").pack(anchor="w", pady=(12, 6))
         buttons = tk.Frame(body, bg=SURFACE)
@@ -87,8 +93,11 @@ class CatalogPicker(tk.Toplevel):
         ActionButton(buttons, "Toevoegen", self._add, width=114).pack(side="left")
         ActionButton(buttons, "Bewerken", self._edit, width=105).pack(side="left", padx=(7, 0))
         ActionButton(buttons, "Verwijderen", self._delete, width=112).pack(side="left", padx=(7, 0))
-        ActionButton(buttons, "Overnemen", self._accept, primary=True, width=130).pack(side="right")
-        ActionButton(buttons, "Annuleren", self._cancel, width=110).pack(side="right", padx=(0, 7))
+        if self.manage_only:
+            ActionButton(buttons, "Sluiten", self._cancel, primary=True, width=110).pack(side="right")
+        else:
+            ActionButton(buttons, "Overnemen", self._accept, primary=True, width=130).pack(side="right")
+            ActionButton(buttons, "Annuleren", self._cancel, width=110).pack(side="right", padx=(0, 7))
 
     def _refresh(self):
         if not hasattr(self, "tree"):
@@ -99,13 +108,14 @@ class CatalogPicker(tk.Toplevel):
         if children:
             self.tree.delete(*children)
         for item in self.store.items(self.categories):
-            if (self.role_code == "LEEK" and item.category == "S"
+            if (self.role_code in ("LEEK", "ZZP") and item.category == "S"
                     and item.code != "S02"):
                 continue
             if term and term not in (item.code + " " + item.name + " " + item.explanation).casefold():
                 continue
             self.tree.insert("", "end", iid=item.code,
-                             values=("✓" if item.code in self.chosen else "", item.code, item.name))
+                             values=("" if self.manage_only else
+                                     "●" if item.code in self.chosen else "○", item.code, item.name))
         if focused and self.tree.exists(focused):
             self.tree.focus(focused)
         self._show_detail()
@@ -114,15 +124,18 @@ class CatalogPicker(tk.Toplevel):
         code = self.tree.identify_row(event.y)
         if code:
             self.tree.focus(code)
-            self._toggle(code)
-        return "break"
+            self.tree.selection_set(code)
+            self._show_detail()
+            if not self.manage_only and self.tree.identify_column(event.x) == "#1":
+                self._toggle(code)
+        return "break" if code else None
 
     def _toggle_focused(self, _event):
         self._toggle(self.tree.focus())
         return "break"
 
     def _toggle(self, code):
-        if not code:
+        if not code or self.manage_only:
             return
         item = self.store.get(code)
         if not item.selectable:
@@ -132,7 +145,7 @@ class CatalogPicker(tk.Toplevel):
             self.chosen.remove(code)
         else:
             self.chosen.add(code)
-        self.tree.set(code, "check", "✓" if code in self.chosen else "")
+        self.tree.set(code, "check", "●" if code in self.chosen else "○")
         self._show_detail()
 
     def _show_detail(self):
@@ -250,7 +263,7 @@ class CatalogPicker(tk.Toplevel):
     def _accept(self):
         self.answer = [item.code for item in self.store.items(self.categories)
                        if item.code in self.chosen and item.selectable
-                       and (self.role_code != "LEEK" or item.category != "S" or item.code == "S02")]
+                       and (self.role_code not in ("LEEK", "ZZP") or item.category != "S" or item.code == "S02")]
         self.grab_release()
         self.destroy()
 
@@ -265,84 +278,122 @@ def choose_codes(parent, store, categories, title, selected=None, role_code=""):
     return window.answer
 
 
+def manage_codes(parent, store):
+    window = CatalogPicker(parent, store, tuple(CATEGORIES), "Alle codes beheren", manage_only=True)
+    parent.wait_window(window)
+
+
+def format_machine_permissions(machine, tasks):
+    """Eén machine met uitsluitend de voor deze persoon gekozen bevoegdheden."""
+    if not tasks:
+        raise ValueError("Kies ten minste één taak voor deze machine.")
+    return f"Machine: {machine.line}\nBevoegdheden:\n" + "\n".join(
+        f"• {task.line}" for task in tasks
+    )
+
+
 def make_combination(parent, store, is_leek=False):
-    """Vraag precies één taak, één object en de toepasselijke procedure."""
+    """Kies één machine en meerdere uitdrukkelijk toegestane taken."""
     window = tk.Toplevel(parent)
-    window.title("Bevoegdheidsregel toevoegen")
+    window.title("Bevoegdheden per machine toevoegen")
     window.configure(bg=BACKGROUND)
-    window.geometry(f"680x515+{parent.winfo_rootx()+45}+{parent.winfo_rooty()+30}")
+    width = min(750, max(610, parent.winfo_screenwidth() - 100))
+    height = min(650, max(490, parent.winfo_screenheight() - 110))
+    top = max(10, min(parent.winfo_rooty() + 30, parent.winfo_screenheight() - height - 45))
+    window.geometry(f"{width}x{height}+{parent.winfo_rootx()+45}+{top}")
     window.minsize(610, 490)
     window.transient(parent)
     answer = {"text": None}
-    card = Card(window, padding=21, expand=True)
+    card = Card(window, padding=18, expand=True)
     card.pack(fill="both", expand=True, padx=12, pady=12)
     body = card.body
-    tk.Label(body, text="Eén toegestane combinatie", bg=SURFACE, fg=INK,
+    tk.Label(body, text="Persoonlijke bevoegdheden per machine", bg=SURFACE, fg=INK,
              font=("Arial", 15, "bold")).pack(anchor="w")
-    tk.Label(body, text="Een losse taak of machine geeft geen toestemming voor alle combinaties.",
-             bg=SURFACE, fg=MUTED, font=("Arial", 9)).pack(anchor="w", pady=(2, 10))
+    tk.Label(body, text="Kies een machine en vink de taken aan die deze persoon daar mag uitvoeren. Klik een taak voor de uitleg.",
+             bg=SURFACE, fg=MUTED, font=("Arial", 9), wraplength=660,
+             justify="left").pack(anchor="w", pady=(2, 12))
 
-    menus = {}
-    for heading, categories in (
-        ("Taak", ("L", "S") if is_leek else ("S",)),
-        ("Machine / installatie", ("M",)),
-        ("Procedure", ("P",)),
-    ):
-        items = [item for item in store.items(categories) if item.selectable
-                 and (not is_leek or heading != "Taak" or item.category == "L" or item.code == "S02")]
-        options = [(item.line, item) for item in items]
-        if heading == "Procedure":
-            options.insert(0, ("Geen procedure gekozen – toelichten bij voorwaarden", None))
-        tk.Label(body, text=heading, bg=SURFACE, fg=INK,
-                 font=("Arial", 9, "bold")).pack(anchor="w", pady=(3, 0))
-        combo = ttk.Combobox(body, state="readonly", font=("Arial", 10),
-                             values=[label for label, _item in options])
-        combo.pack(fill="x", pady=(3, 5))
-        menus[heading] = (combo, options)
+    machines = [item for item in store.items(("M",)) if item.selectable]
+    tk.Label(body, text="Machine / installatie", bg=SURFACE, fg=INK,
+             font=("Arial", 9, "bold")).pack(anchor="w")
+    machine = ttk.Combobox(body, state="readonly", font=("Arial", 10),
+                           values=[item.line for item in machines])
+    machine.pack(fill="x", pady=(4, 7))
+    machine_info = tk.Label(body, text="Selecteer eerst de machine.", bg=SURFACE,
+                            fg=MUTED, font=("Arial", 9), wraplength=650, justify="left")
+    machine_info.pack(anchor="w", pady=(0, 11))
 
-    task_info = tk.Label(body, text="Bekijk bij de keuze van een taak ook de voorwaarden uit het model.",
-                         bg=SURFACE, fg=MUTED, font=("Arial", 9),
-                         wraplength=600, justify="left")
-    task_info.pack(anchor="w", pady=(1, 5))
+    tk.Label(body, text="Taken voor deze machine · selecteer via het rondje", bg=SURFACE,
+             fg=INK, font=("Arial", 9, "bold")).pack(anchor="w", pady=(0, 5))
+    tasks = [item for item in store.items(("L", "S") if is_leek else ("S", "L"))
+             if item.selectable and (not is_leek or item.category == "L" or item.code == "S02")]
+    chosen = set()
+    table_frame = tk.Frame(body, bg=SURFACE)
+    table_frame.pack(fill="both", expand=True, pady=(0, 9))
+    table = ttk.Treeview(table_frame, columns=("choose", "code", "name"),
+                         show="headings", height=9, selectmode="browse")
+    for key, label, size in (("choose", "", 47), ("code", "Code", 74), ("name", "Taak", 420)):
+        table.heading(key, text=label)
+        table.column(key, width=size, minwidth=size if key != "name" else 180,
+                     stretch=key == "name", anchor="center" if key == "choose" else "w")
+    scroll = ttk.Scrollbar(table_frame, orient="vertical", command=table.yview)
+    table.configure(yscrollcommand=scroll.set)
+    table.pack(side="left", fill="both", expand=True)
+    scroll.pack(side="right", fill="y")
+    info = tk.Label(body, text="Kies een taak voor de uitleg uit het aanwijzingsmodel.", bg="#F0F1F1",
+                    fg=INK, font=("Arial", 9), wraplength=640, justify="left",
+                    padx=11, pady=10, anchor="nw", height=4)
+    info.pack(fill="x", pady=(0, 12))
 
-    def show_task_info(_event):
-        combo, choices = menus["Taak"]
-        item = choices[combo.current()][1] if combo.current() >= 0 else None
-        task_info.configure(text=item.explanation if item else "")
+    def refresh_tasks(_event=None):
+        selected_machine = machines[machine.current()] if machine.current() >= 0 else None
+        machine_info.configure(text=selected_machine.explanation if selected_machine else "Selecteer eerst de machine.")
+        chosen.clear()
+        table.delete(*table.get_children())
+        for item in tasks:
+            if selected_machine and selected_machine.code == "M12" and item.category != "L":
+                continue
+            table.insert("", "end", iid=item.code, values=("○", item.code, item.name))
+        info.configure(text="Kies een taak voor de uitleg uit het aanwijzingsmodel.")
 
-    menus["Taak"][0].bind("<<ComboboxSelected>>", show_task_info)
+    def clicked(event):
+        code = table.identify_row(event.y)
+        if code:
+            table.focus(code)
+            table.selection_set(code)
+            item = store.get(code)
+            info.configure(text=f"{item.line}\n{item.explanation}")
+            if table.identify_column(event.x) == "#1":
+                if code in chosen:
+                    chosen.remove(code)
+                else:
+                    chosen.add(code)
+                table.set(code, "choose", "●" if code in chosen else "○")
+            return "break"
+        return None
 
-    tk.Label(body, text="Voorwaarden: objectdeel / assetnummer, verantwoordelijke, toestand en toezicht",
-             bg=SURFACE, fg=INK, font=("Arial", 9, "bold"),
-             wraplength=590, justify="left").pack(anchor="w", pady=(5, 2))
-    context = tk.Text(body, height=3, font=("Arial", 10), wrap="word",
-                      bg=WHITE, fg=INK, relief="solid", bd=1)
-    context.pack(fill="both", expand=True, pady=(0, 10))
+    table.bind("<Button-1>", clicked)
+    machine.bind("<<ComboboxSelected>>", refresh_tasks)
+    refresh_tasks()
 
     def close():
         window.grab_release()
         window.destroy()
 
     def accept():
-        chosen = []
-        for heading, (combo, options) in menus.items():
-            if combo.current() < 0 or (heading != "Procedure" and options[combo.current()][1] is None):
-                messagebox.showerror("Nog niet volledig", f"Kies een {heading.lower()}.", parent=window)
-                return
-            chosen.append(options[combo.current()][1])
-        details = context.get("1.0", "end-1c").strip()
-        if not details:
-            messagebox.showerror("Nog niet volledig", "Beschrijf het objectdeel en de voorwaarden waaronder dit is toegestaan.", parent=window)
+        if machine.current() < 0:
+            messagebox.showerror("Nog niet volledig", "Kies eerst een machine.", parent=window)
             return
-        task, machine, procedure = chosen
-        procedure_name = procedure.line if procedure else "geen procedure gekoppeld (toelichting vereist)"
-        answer["text"] = (f"Taak: {task.line} | Object: {machine.line} | Procedure: {procedure_name}\n"
-                          f"Voorwaarden: {details}")
+        if not chosen:
+            messagebox.showerror("Nog niet volledig", "Vink één of meer taken aan via het rondje links.", parent=window)
+            return
+        selected = [item for item in tasks if item.code in chosen]
+        answer["text"] = format_machine_permissions(machines[machine.current()], selected)
         close()
 
     buttons = tk.Frame(body, bg=SURFACE)
     buttons.pack(fill="x")
-    ActionButton(buttons, "Regel toevoegen", accept, primary=True, width=156).pack(side="right")
+    ActionButton(buttons, "Bevoegdheden overnemen", accept, primary=True, width=220).pack(side="right")
     ActionButton(buttons, "Annuleren", close, width=108).pack(side="right", padx=(0, 9))
     window.protocol("WM_DELETE_WINDOW", close)
     window.bind("<Escape>", lambda _e: close())

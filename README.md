@@ -1,13 +1,15 @@
 # Eqraft | NEN 3140 Aanwijzingen
 
 Windows-programma voor het maken van een aanwijzing voor IV, WV, VP of VOP en
-voor het vastleggen van een instructie aan een leek. De ingevoerde bevoegdheden,
+voor het vastleggen van instructie aan een leek of tijdelijke inzet van een zzp'er. De ingevoerde bevoegdheden,
 werkzaamheden en grenzen worden letterlijk in het Word-sjabloon gezet;
 rolgebonden verantwoordelijkheden en een beknopt bevoegdheidskader worden
 automatisch ingevuld.
 
-**Let op:** 'Leek' is in dit programma een **instructieregistratie**, geen
-elektrotechnische aanwijzing. De exacte toegestane taken en installaties worden
+**Let op:** 'Leek' en 'ZZP'er' zijn in dit programma registraties van instructie
+of tijdelijke inzet, **geen elektrotechnische aanwijzing**. Ook bij een ingehuurde
+elektromonteur is voor elektrisch werk een afzonderlijke, passende rolgebonden
+aanwijzing nodig. De exacte toegestane taken en installaties worden
 door de organisatie ingevuld. Bekijk het resultaat voordat het wordt ondertekend.
 
 ## Zonder Python op je werkcomputer
@@ -29,6 +31,7 @@ NEN3140_Aanwijzingen/
 ├── config.py
 ├── catalogus.py
 ├── catalogus_venster.py
+├── settings.py
 ├── document_generator.py
 ├── requirements.txt
 ├── README.md
@@ -45,18 +48,20 @@ NEN3140_Aanwijzingen/
 └── output/
 ```
 
-Er is één bewerkbaar Word-sjabloon voor alle vijf keuzemogelijkheden. Het
+Er is één bewerkbaar Word-sjabloon voor alle zes keuzemogelijkheden. Het
 originele sjabloon wordt nooit overschreven. Het meegeleverde Eqraft-logo staat
 in de koptekst van het sjabloon. Het formulier heeft een zelfstandig vak voor
 **Bevoegdheden en toegestane handelingen** en een apart, automatisch gevuld vak
 voor **Verantwoordelijkheden per rol**. Binnen het bevoegdhedenvak staan het
 automatische rolkader en jullie concrete toestemming los van elkaar.
-Organisatie is een invoerveld in de documentinhoud.
+Organisatie is een invoerveld in de documentinhoud. Persoonlijke taken staan
+onder **Bevoegdheden per machine** als opsomming.
 
 Het formulier gebruikt de Eqraft-kleuren en het logo. De Windows-exe heeft
 het Eqraft-icoon. Boven beide handtekeningregels in het Word-sjabloon is extra
-schrijfruimte vrijgemaakt. Links staan de werkende opties **Aanwijzing maken**,
-**Uitleg en werkwijze** en **Afsluiten**. Boven het formulier zie je direct de
+schrijfruimte vrijgemaakt. Links staan **Aanwijzing maken**, **Uitleg en werkwijze**,
+**Aanwijzingsmodel**, **Alle codes beheren**, **Instellingen** en **Afsluiten**.
+Boven het formulier zie je direct de
 persoon, het type, de locatie en of de bevoegdheden zijn ingevuld. Kaarten en
 invoervelden hebben een rustige, afgeronde Eqraft-opmaak. Onderaan zie je de
 voortgang bij verplichte velden.
@@ -73,7 +78,8 @@ in. Alle data hebben formaat `dd-mm-jjjj`.
 ## Keuzevensters en eigen aanvullingen
 
 Naast **Installaties**, **Werkzaamheden**, **Procedures** en **Bevoegdheden**
-staat **Kies codes**. Daar kun je zoeken en meer dan één item kiezen. Rechts
+staat **Kies codes**. Daar kun je zoeken en via het rondje links meer dan één item kiezen.
+Een klik op een regel toont uitleg, zonder de code te selecteren. Rechts
 verschijnt per code de toelichting uit `documents/Aanwijzingsmodel.docx`:
 
 | Veld | Codes |
@@ -83,15 +89,19 @@ verschijnt per code de toelichting uit `documents/Aanwijzingsmodel.docx`:
 | Procedures | P: procedureonderwerpen |
 | Bevoegdheden | R: aanvullende bevoegdheden |
 
-De knop **Toevoegen** in ieder keuzevenster laat je zelf een code, benaming en
-uitleg bewaren. Je kunt eigen codes later bewerken of verwijderen. Deze lijst
+Via **Alle codes beheren** in de zijbalk bekijk je L-, S-, M-, P- en R-codes
+op één plek en voeg je eigen codes en uitleg toe zonder het formulier te openen.
+Eigen codes kun je later bewerken of verwijderen. Deze lijst
 wordt per Windows-gebruiker opgeslagen in
 `%LOCALAPPDATA%\Eqraft\NEN3140_Aanwijzingen\catalogus.json` en blijft na een
 update van de exe bestaan. De ingebouwde codes komen rechtstreeks uit het
 Word-model en zijn daarom alleen te wijzigen door dat document te vervangen.
 Zet desgewenst een aangepaste kopie in `documents\Aanwijzingsmodel.docx` naast
 de exe; die krijgt voorrang op de ingebouwde versie. In de zijbalk opent
-**Aanwijzingsmodel** het volledige Word-bestand.
+**Aanwijzingsmodel** het volledige Word-bestand. De complete downloadbundel bevat
+de bijgewerkte Word-bestanden; zet `documents/` en `templates/` uit die bundel
+naast de exe als je alleen de exe van GitHub Actions gebruikt. De losse exe uit
+de publieke repository bevat de oudere versie van die twee Word-bestanden.
 
 De geselecteerde **code en benaming** komen in het tekstveld en daarna in de
 aanwijzing. Vrije tekst kan daarnaast blijven staan. **S01** is volgens het
@@ -99,17 +109,29 @@ model alleen een rubriektitel en is daarom niet selecteerbaar. Het aangeleverde
 model bevat geen aparte benaming voor M04 en M06; daarvoor gebruikt de app de
 omschrijving uit dezelfde modelrij. Voor M07 is geen verdere uitleg ingevuld.
 
-Met **Regel toevoegen** leg je één combinatie van taak, machine, eventuele
-procedure en concreet beschreven voorwaarden vast. Gebruik het veld
-**Persoonsgebonden bevoegdheidsregels** voor de daadwerkelijk overeengekomen
-combinaties; losse codes op zichzelf verlenen geen algemene toestemming. Als je
-codes selecteert, verlangt het programma daarom ook een bevoegdheidsregel.
-Controleer bij procedures altijd het echte documentnummer, de revisie en de
-instructie. Een eigen code of selectie is geen automatische NEN-aanwijzing.
+**M12 – Alle machines – uitsluitend mechanische taken** staat in het bijgewerkte
+aanwijzingsmodel van de complete downloadbundel. De keuze geldt alleen voor de afgesproken werkplek en de
+persoonlijk gekozen mechanische L-taken. Aansluiten, afkoppelen, meten,
+schakelen en werken aan elektrische onderdelen vallen er niet onder.
 
-1. Kies IV, WV, VP, VOP of Leek. Bij Leek registreer je instructie; dit is geen elektrotechnische aanwijzing.
+Met **Machine en taken kiezen** kies je één machine en meerdere persoonlijk
+toegestane taken tegelijk. Het document krijgt bijvoorbeeld deze indeling:
+
+```text
+Machine: M02 – Baxmatic
+Bevoegdheden:
+• S02 – [benaming uit het aanwijzingsmodel]
+• S03 – [benaming uit het aanwijzingsmodel]
+```
+
+De keuze vraagt geen procedure of apart voorwaardenveld. Het algemene formulier
+heeft nog een optioneel procedureveld voor situaties waar dat nuttig is. Losse
+codes geven op zichzelf geen algemene toestemming. Bij M12 zijn alleen
+mechanische L-taken selecteerbaar.
+
+1. Kies IV, WV, VP, VOP, Leek of ZZP'er. Bij Leek en ZZP'er registreer je instructie en inzet; dit is geen elektrotechnische aanwijzing.
 2. Vul gegevens, installaties, taken, persoonlijke bevoegdheden en beperkingen in. De rolgebonden teksten volgen automatisch uit de gekozen rol.
-3. Klik op **Document maken**, kies waar je het Word-bestand opslaat en controleer het resultaat. Als Microsoft Word aanwezig is, wordt ook een PDF gemaakt.
+3. Kies in **Instellingen** één keer de bestaande hoofdmap **AANWIJZINGEN** en **Word en PDF**, **Alleen Word** of **Alleen PDF**. Daarna slaat **Document maken** op onder bijvoorbeeld `AANWIJZINGEN/WV/Mika van Eijken/`. Voor PDF is Microsoft Word nodig; bij **Alleen PDF** en zonder Word blijft een Word-document als terugvaloptie bewaard. Instellingen worden bewaard in `%LOCALAPPDATA%\Eqraft\NEN3140_Aanwijzingen\instellingen.json`.
 
 De aanwijzer beoordeelt de kennis en ervaring van de persoon, de concrete
 werkzaamheden en de grenzen vóór ondertekening. Het programma kan die
@@ -180,5 +202,5 @@ python -m PyInstaller --onefile --noconsole --name NEN3140_Aanwijzingen --icon a
 
 De Windows-bouwserver van GitHub voert deze opdracht automatisch uit bij een
 push naar `main` of in een pull request; je hoeft lokaal niets te installeren.
-Met `NEN3140_Aanwijzingen.exe --self-test` controleer je alle vijf rollen en
+Met `NEN3140_Aanwijzingen.exe --self-test` controleer je alle zes rollen en
 het meegeleverde sjabloon zonder het venster te openen.

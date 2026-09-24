@@ -11,10 +11,11 @@ from tkinter import filedialog, messagebox, ttk
 import traceback
 
 from catalogus import CatalogStore, MODEL_NAME, merge_selected_lines
-from catalogus_venster import choose_codes, make_combination
+from catalogus_venster import choose_codes, make_combination, manage_codes, format_machine_permissions
 from config import (APP_TITLE, DATE_FIELDS, PICKER_FIELDS, SECTIONS, TYPES,
                     document_values, template_path, resource_path)
 from document_generator import TemplateError, _all_paragraphs, export_pdf, generate_docx
+from settings import AppSettings, EXPORT_MODES, load_settings, output_paths, save_settings
 from ui_components import (ActionButton, BACKGROUND, BORDER, Card, DARK, ERROR,
                            INK, InputBox, MUTED, NavItem, SelectBox, SIDEBAR,
                            SURFACE, SummaryTile, WHITE, YELLOW, rounded_rect)
@@ -22,7 +23,7 @@ from ui_components import (ActionButton, BACKGROUND, BORDER, Card, DARK, ERROR,
 
 SECTION_TIPS = {
     "Gegevens persoon": "Vul de persoon en de periode van deze aanwijzing in.",
-    "Omvang en werkzaamheden": "Baken locatie, installaties en de toegestane werkzaamheden concreet af.",
+    "Omvang en werkzaamheden": "Baken locatie, machines en de toegestane werkzaamheden concreet af.",
     "Bevoegdheden en grenzen": "Leg hier vast wat deze persoon mag doen en welke grenzen gelden.",
     "Namens de organisatie": "Gegevens van degene die de aanwijzing afgeeft.",
     "Ondertekening betrokkene": "De datum waarop de betrokken persoon ondertekent.",
@@ -30,11 +31,15 @@ SECTION_TIPS = {
 
 FIELD_TIPS = {
     "INSTALLATIES": "Welke machine, gebouwinstallatie of installatiedelen vallen hieronder?",
-    "VERANTWOORDELIJKHEIDSGEBIED": "Waar begint en eindigt de verantwoordelijkheid van deze persoon?",
+    "VERANTWOORDELIJKHEIDSGEBIED": (
+        "Beschrijf voor welk deel van het pand, welke machines en welke mensen deze rol geldt. "
+        "Vermeld waar het gebied eindigt en wie verantwoordelijk is voor het overige deel. "
+        "Voorbeeld: WV voor VOP en VP in de assemblagehal; gebouwinstallatie valt onder de IV van het pand."
+    ),
     "WERKZAAMHEDEN": "Voor VOP: beschrijf elke toegestane taak en de gegeven instructie.",
     "PROCEDURES": "Kies P-codes. Vul documentnummer, revisie en gegeven instructie ook concreet in.",
     "BEVOEGDHEDEN": "Vul persoonlijke toestemming in. Het automatische rolkader staat apart in Word.",
-    "COMBINATIES": "Leg per bevoegdheid één taak + één object + de toepasselijke procedure en voorwaarden vast.",
+    "COMBINATIES": "Kies per machine alle taken die deze persoon daar mag doen. Voeg voor een andere machine een volgende regel toe.",
     "BEPERKINGEN": "Noem uitgesloten taken, toezicht of afspraken bij afwijkingen.",
 }
 
@@ -68,6 +73,7 @@ class Application(tk.Tk):
         self.selected_codes = {key: [] for key in PICKER_FIELDS}
         self.inserted_lines = {key: [] for key in PICKER_FIELDS}
         self.logo_image = None
+        self.settings = load_settings()
         self.type_var = tk.StringVar(value=next(iter(TYPES)))
         self.role_preview = tk.StringVar()
         self.progress_text = tk.StringVar()
@@ -195,8 +201,8 @@ class Application(tk.Tk):
                     ActionButton(label_row, "Kies codes", lambda chosen_key=key: self._choose_for(chosen_key),
                                  width=124).pack(side="right")
                 elif key == "COMBINATIES":
-                    ActionButton(label_row, "Regel toevoegen", self._add_combination,
-                                 width=151).pack(side="right")
+                    ActionButton(label_row, "Machine en taken kiezen", self._add_combination,
+                                 width=195).pack(side="right")
                 field.bind("<Configure>", lambda e, target=label_widget:
                            target.configure(wraplength=max(160, e.width - 8)))
                 self.field_labels[key] = (label_widget, label, required)
@@ -258,6 +264,8 @@ class Application(tk.Tk):
                 selected=True).pack(fill="x", padx=6, pady=(0, 7))
         NavItem(sidebar, "Uitleg en werkwijze", self._show_guide).pack(fill="x", padx=6)
         NavItem(sidebar, "Aanwijzingsmodel", self._open_model).pack(fill="x", padx=6, pady=(7, 0))
+        NavItem(sidebar, "Alle codes beheren", self._manage_catalog).pack(fill="x", padx=6, pady=(7, 0))
+        NavItem(sidebar, "Instellingen", self._show_settings).pack(fill="x", padx=6, pady=(7, 0))
 
         bottom = tk.Frame(sidebar, bg=SIDEBAR)
         bottom.pack(side="bottom", fill="x", padx=7, pady=(0, 12))
@@ -336,9 +344,9 @@ class Application(tk.Tk):
         role = TYPES[self.type_var.get()]
         for key, (label_widget, label, required) in self.field_labels.items():
             label_widget.configure(text=label + ("  *" if required or key in role["required_fields"] else ""))
-        if role["code"] == "LEEK":
-            self.role_preview.set("Dit is een instructieregistratie en geen elektrotechnische aanwijzing. "
-                                  "Leg het toegestane normale gebruik concreet vast.")
+        if role["code"] in ("LEEK", "ZZP"):
+            self.role_preview.set("Leg de toegestane taken en machines persoonlijk vast. "
+                                  "Deze keuze geeft geen elektrotechnische bevoegdheid.")
         else:
             self.role_preview.set("De rolteksten worden automatisch ingevuld. "
                                   "Vul persoonlijke taken, bevoegdheden en grenzen hieronder in.")
@@ -347,15 +355,16 @@ class Application(tk.Tk):
     def _show_guide(self):
         self._dialog(
             "Zo werkt het",
-            "1. Kies IV, WV, VP, VOP of Leek. Leek is een instructieregistratie.\n\n"
+            "1. Kies IV, WV, VP, VOP, Leek of ZZP'er. Leek en ZZP'er registreren inzet of instructie; "
+            "voor elektrisch werk is daarnaast een passende NEN-aanwijzing nodig.\n\n"
             "2. Vul de velden met * in. Met Kies codes selecteer je machines (M), taken (L/S), "
-            "procedures (P) en aanvullende bevoegdheden (R). Klik een code aan voor de uitleg. "
-            "Met Toevoegen voeg je zelf codes toe voor nieuwe machines of werkzaamheden.\n\n"
-            "3. Leg met Regel toevoegen per keer één concrete taak, één object, de toepasselijke "
-            "procedure en de voorwaarden vast. Losse keuzes geven geen algemene toestemming. "
-            "Vrije tekst blijft mogelijk.\n\n"
-            "4. Klik op Document maken, kies een opslagplaats en controleer het Word-document "
-            "vóór ondertekening. Met Microsoft Word wordt ook een PDF gemaakt.",
+            "procedures (P) en aanvullende bevoegdheden (R). Klik op de tekst voor uitleg; "
+            "alleen via het rondje links selecteer je een code. Beheer nieuwe codes via de zijbalk.\n\n"
+            "3. Kies bij Bevoegdheden per machine één machine en meerdere toegestane taken. "
+            "Voor M12 zijn uitsluitend mechanische L-taken mogelijk. De procedures elders in het formulier "
+            "zijn optioneel; de bevoegdheidsregel vraagt er niet om.\n\n"
+            "4. Kies bij Instellingen de hoofdmap AANWIJZINGEN en het gewenste bestandsformaat. "
+            "Document maken slaat daarna automatisch op onder rol / persoonsnaam. Controleer voor ondertekening.",
             kind="info",
         )
 
@@ -371,6 +380,98 @@ class Application(tk.Tk):
                 self._dialog("Aanwijzingsmodel", f"Het model staat op:\n{model}")
         except OSError as exc:
             self._dialog("Aanwijzingsmodel niet geopend", f"Open het bestand zelf in Word:\n{model}\n\n{exc}", kind="error")
+
+    def _manage_catalog(self):
+        try:
+            manage_codes(self, CatalogStore())
+        except (OSError, ValueError, FileNotFoundError) as exc:
+            self._dialog("Codelijst niet beschikbaar", str(exc), kind="error")
+
+    def _show_settings(self):
+        window = tk.Toplevel(self)
+        window.title("Instellingen")
+        window.configure(bg=BACKGROUND)
+        window.geometry(f"590x385+{self.winfo_rootx()+60}+{self.winfo_rooty()+45}")
+        window.minsize(530, 355)
+        window.transient(self)
+        card = Card(window, padding=21, expand=True)
+        card.pack(fill="both", expand=True, padx=12, pady=12)
+        body = card.body
+        tk.Label(body, text="Instellingen", bg=SURFACE, fg=INK,
+                 font=("Arial", 16, "bold")).pack(anchor="w", pady=(0, 6))
+        tk.Label(body, text="Bepaal waar de documenten komen en welke bestanden je maakt.",
+                 bg=SURFACE, fg=MUTED, font=("Arial", 9)).pack(anchor="w", pady=(0, 19))
+        tk.Label(body, text="Hoofdmap aanwijzingen", bg=SURFACE, fg=INK,
+                 font=("Arial", 10, "bold")).pack(anchor="w")
+        tk.Label(body, text="Kies je bestaande map AANWIJZINGEN. Daaronder maakt de app rol / persoonsnaam aan.",
+                 bg=SURFACE, fg=MUTED, font=("Arial", 9), wraplength=515,
+                 justify="left").pack(anchor="w", pady=(2, 7))
+        folder = tk.StringVar(value=self.settings.output_root)
+        folder_row = tk.Frame(body, bg=SURFACE)
+        folder_row.pack(fill="x", pady=(0, 20))
+        tk.Entry(folder_row, textvariable=folder, font=("Arial", 10),
+                 bg=WHITE, fg=INK, relief="solid", bd=1).pack(side="left", fill="x", expand=True, ipady=8)
+
+        def browse():
+            start = folder.get().strip()
+            initial = start if start and Path(start).is_dir() else str(Path.home() / "Documents")
+            selected = filedialog.askdirectory(parent=window, title="Kies hoofdmap AANWIJZINGEN",
+                                               initialdir=initial if Path(initial).is_dir() else str(Path.home()))
+            if selected:
+                folder.set(selected)
+
+        ActionButton(folder_row, "Bladeren", browse, width=110).pack(side="left", padx=(8, 0))
+        tk.Label(body, text="Bestanden maken", bg=SURFACE, fg=INK,
+                 font=("Arial", 10, "bold")).pack(anchor="w")
+        options = list(EXPORT_MODES)
+        format_choice = ttk.Combobox(body, state="readonly", values=options, font=("Arial", 10))
+        format_choice.set(next(label for label, value in EXPORT_MODES.items()
+                               if value == self.settings.export_mode))
+        format_choice.pack(fill="x", pady=(5, 7))
+        tk.Label(body, text="Voor PDF is Microsoft Word op deze pc nodig. Zonder Word bewaren we altijd de Word-versie.",
+                 bg=SURFACE, fg=MUTED, font=("Arial", 9),
+                 wraplength=515, justify="left").pack(anchor="w")
+
+        def close():
+            window.grab_release()
+            window.destroy()
+
+        def save():
+            selected = folder.get().strip()
+            if selected and not Path(selected).is_dir():
+                messagebox.showerror("Map ontbreekt", "Kies een bestaande hoofdmap voor de aanwijzingen.", parent=window)
+                return
+            next_settings = AppSettings(selected, EXPORT_MODES[format_choice.get()])
+            try:
+                save_settings(next_settings)
+            except (OSError, ValueError) as exc:
+                messagebox.showerror("Niet opgeslagen", str(exc), parent=window)
+                return
+            self.settings = next_settings
+            close()
+
+        buttons = tk.Frame(body, bg=SURFACE)
+        buttons.pack(side="bottom", fill="x", pady=(10, 0))
+        ActionButton(buttons, "Opslaan", save, primary=True, width=120).pack(side="right")
+        ActionButton(buttons, "Annuleren", close, width=120).pack(side="right", padx=(0, 8))
+        window.protocol("WM_DELETE_WINDOW", close)
+        window.bind("<Escape>", lambda _e: close())
+        window.grab_set()
+        self.wait_window(window)
+
+    def _output_root(self):
+        root = self.settings.output_root
+        if root and Path(root).is_dir():
+            return root
+        initial = str(Path.home() / "Documents")
+        selected = filedialog.askdirectory(
+            parent=self, title="Kies de hoofdmap AANWIJZINGEN (eenmalig)",
+            initialdir=initial if Path(initial).is_dir() else str(Path.home()),
+        )
+        if selected:
+            self.settings.output_root = selected
+            save_settings(self.settings)
+        return selected
 
     def _choose_for(self, key):
         try:
@@ -398,7 +499,8 @@ class Application(tk.Tk):
         except (OSError, ValueError, FileNotFoundError) as exc:
             self._dialog("Codelijst niet beschikbaar", str(exc), kind="error")
             return
-        result = make_combination(self, store, is_leek=TYPES[self.type_var.get()]["code"] == "LEEK")
+        result = make_combination(self, store,
+                                  is_leek=TYPES[self.type_var.get()]["code"] in ("LEEK", "ZZP"))
         if not result:
             return
         widget = self.widgets["COMBINATIES"]
@@ -461,15 +563,21 @@ class Application(tk.Tk):
 
     def _validate(self, values):
         role = TYPES[self.type_var.get()]
-        if role["code"] == "LEEK":
+        if role["code"] in ("LEEK", "ZZP"):
             chosen_skill_codes = set(re.findall(
                 r"\bS\d{2,4}[A-Z]?\b",
-                values["WERKZAAMHEDEN"] + "\n" + values["COMBINATIES"],
+                values["WERKZAAMHEDEN"] + "\n" + values["COMBINATIES"]
+                + "\n" + values["BEVOEGDHEDEN"],
             ))
             if chosen_skill_codes - {"S02"}:
                 self._focus_field("WERKZAAMHEDEN")
-                raise ValueError("Een Leek kan geen elektrotechnische S-taken krijgen. "
-                                 "Gebruik L-codes voor mechanische taken; S02 alleen voor geïnstrueerd normaal gebruik.")
+                raise ValueError("Deze registratie geeft geen elektrotechnische S-taken. "
+                                 "Gebruik L-codes voor mechanische taken; S02 alleen voor geïnstrueerd normaal gebruik. "
+                                 "Kies voor elektrisch werk ook een passende formele NEN 3140-aanwijzing.")
+        for segment in re.split(r"(?=\bMachine:\s*)", values["COMBINATIES"]):
+            if re.match(r"Machine:\s*M12\b", segment) and re.search(r"\bS\d{2,4}[A-Z]?\b", segment):
+                self._focus_field("COMBINATIES")
+                raise ValueError("M12 geldt uitsluitend voor mechanische taken (L-codes), niet voor elektrische S-taken.")
         missing = [label for _heading, fields in SECTIONS
                    for label, key, required, _multi in fields
                    if (required or key in role["required_fields"]) and not values[key]]
@@ -492,14 +600,13 @@ class Application(tk.Tk):
         if parsed["GELDIG_TOT"] < parsed["INGANGSDATUM"]:
             self._focus_field("GELDIG_TOT")
             raise ValueError("'Geldig tot' mag niet vóór de ingangsdatum liggen.")
-        selections_in_use = any(
-            line in values[key].splitlines()
-            for key, lines in self.inserted_lines.items() for line in lines
-        )
+        selections_in_use = any(line in values[key].splitlines()
+                                for key in ("INSTALLATIES", "WERKZAAMHEDEN")
+                                for line in self.inserted_lines[key])
         if selections_in_use and not values["COMBINATIES"]:
             self._focus_field("COMBINATIES")
-            raise ValueError("Je hebt codes gekozen. Leg bij Persoonsgebonden bevoegdheidsregels "
-                             "eerst vast welke taak, machine, procedure en voorwaarden samen gelden.")
+            raise ValueError("Je hebt machines of taken gekozen. Leg bij Bevoegdheden per machine "
+                             "vast welke gekozen taken op welke machine zijn toegestaan.")
 
     def _focus_field(self, key):
         widget = self.widgets[key]
@@ -535,48 +642,70 @@ class Application(tk.Tk):
             template = template_path(choice["template"])
             if not template.is_file():
                 raise FileNotFoundError(f"Sjabloon ontbreekt:\n{template}\n\nPlaats daar je eigen Word-sjabloon.")
-            prefix = "Registratie" if choice["code"] == "LEEK" else "Aanwijzing"
-            filename = (f"{prefix} {choice['code']} - {safe_filename(values['VOLLEDIGE_NAAM'])}"
-                        f" - {values['INGANGSDATUM']}.docx")
-            selected = filedialog.asksaveasfilename(
-                title="Sla het aanwijzingsformulier op", defaultextension=".docx",
-                initialfile=filename, filetypes=[("Word-document", "*.docx")],
-            )
-            if not selected:
+            root = self._output_root()
+            if not root:
                 return
-            destination = Path(selected)
+            mode = self.settings.export_mode
+            destination, pdf = output_paths(
+                root, choice["code"], values["VOLLEDIGE_NAAM"], values["INGANGSDATUM"],
+                registration=choice["code"] == "LEEK",
+            )
             if destination.resolve() == template.resolve():
                 raise ValueError("Kies een andere bestandsnaam: het sjabloon mag niet worden overschreven.")
-            if destination.exists() and not self._dialog(
-                "Bestand bestaat al", f"Dit document bestaat al:\n{destination}\n\nOverschrijven?",
-                confirm=True
+            existing = [path for path in (destination if mode != "pdf" else None,
+                                           pdf if mode != "docx" else None)
+                        if path is not None and path.exists()]
+            if existing and not self._dialog(
+                "Bestand bestaat al", "Deze bestanden bestaan al:\n" +
+                "\n".join(str(path) for path in existing) + "\n\nOverschrijven?",
+                confirm=True,
             ):
                 return
-
-            # Eerst volledig in een tijdelijk bestand maken. Fouten laten een
-            # reeds bestaand document daardoor intact.
+            destination.parent.mkdir(parents=True, exist_ok=True)
             with tempfile.NamedTemporaryFile(suffix=".docx", prefix="nen3140_",
                                              dir=destination.parent, delete=False) as handle:
                 temporary = Path(handle.name)
             try:
                 generate_docx(template, temporary, document_values(values, choice))
-                temporary.replace(destination)
+                if mode in ("both", "docx"):
+                    temporary.replace(destination)
+                if mode == "docx":
+                    self._dialog("Document gemaakt", f"Word-document opgeslagen:\n{destination}")
+                    return
+
+                # Word schrijft eerst een nieuwe tijdelijke PDF. Een bestaande
+                # gescande of ondertekende PDF blijft zo intact bij een fout.
+                with tempfile.NamedTemporaryFile(suffix=".pdf", prefix="nen3140_",
+                                                 dir=destination.parent, delete=False) as handle:
+                    temp_pdf = Path(handle.name)
+                temp_pdf.unlink()
+                try:
+                    success, reason = export_pdf(destination if mode == "both" else temporary, temp_pdf)
+                    if success:
+                        temp_pdf.replace(pdf)
+                finally:
+                    temp_pdf.unlink(missing_ok=True)
+
+                if success:
+                    detail = (f"Word-document:\n{destination}\n\n" if mode == "both" else "")
+                    self._dialog("Documenten gemaakt" if mode == "both" else "PDF gemaakt",
+                                 detail + f"PDF:\n{pdf}")
+                else:
+                    if mode == "pdf":
+                        fallback = destination
+                        if fallback.exists():
+                            fallback = destination.with_name(destination.stem + " (PDF niet beschikbaar).docx")
+                            number = 2
+                            while fallback.exists():
+                                fallback = destination.with_name(destination.stem + f" (PDF niet beschikbaar {number}).docx")
+                                number += 1
+                        temporary.replace(fallback)
+                        destination = fallback
+                    self._dialog("Word-document gemaakt",
+                                 f"Word-document opgeslagen:\n{destination}\n\nGeen PDF gemaakt. {reason}",
+                                 kind="warning")
             finally:
                 temporary.unlink(missing_ok=True)
-
-            pdf = destination.with_suffix(".pdf")
-            if pdf.exists() and not self._dialog(
-                "PDF bestaat al", f"Deze PDF bestaat al:\n{pdf}\n\nOverschrijven?",
-                confirm=True
-            ):
-                self._dialog("Document gemaakt", f"Word-document opgeslagen:\n{destination}\n\nPDF overgeslagen.")
-                return
-
-            success, reason = export_pdf(destination, pdf)
-            if success:
-                self._dialog("Documenten gemaakt", f"Word-document:\n{destination}\n\nPDF:\n{pdf}")
-            else:
-                self._dialog("Word-document gemaakt", f"Word-document opgeslagen:\n{destination}\n\nGeen PDF gemaakt. {reason}", kind="warning")
         except (ValueError, FileNotFoundError, TemplateError) as exc:
             self._dialog("Controleer de gegevens", str(exc), kind="error")
         except Exception as exc:
@@ -590,16 +719,27 @@ def self_test():
     for code in ("L01", "S03", "M01", "P01", "R01"):
         if not catalog.get(code) or not catalog.get(code).name:
             raise RuntimeError(f"Aanwijzingsmodel bevat geen bruikbare {code}.")
+    combined = format_machine_permissions(catalog.get("M02"), [catalog.get("S03"), catalog.get("S02")])
+    assert combined.startswith("Machine: M02 – Baxmatic\nBevoegdheden:\n• S03")
+    from settings import AppSettings, load_settings, output_paths, save_settings
     template = template_path(next(iter(TYPES.values()))["template"])
     values = {key: "CONTROLE" for _heading, fields in SECTIONS
               for _label, key, _required, _multi in fields}
-    values.update(INGANGSDATUM="01-01-2026", GELDIG_TOT="01-01-2027")
+    values.update(INGANGSDATUM="01-01-2026", GELDIG_TOT="01-01-2027", COMBINATIES=combined)
     with tempfile.TemporaryDirectory() as folder:
+        path = Path(folder) / "settings.json"
+        save_settings(AppSettings(folder, "pdf"), path)
+        assert load_settings(path).export_mode == "pdf"
+        docx_path, pdf_path = output_paths(folder, "WV", "Mika van Eijken", "01-01-2026")
+        assert docx_path.parent.name == "Mika van Eijken" and docx_path.parent.parent.name == "WV"
+        assert pdf_path.suffix == ".pdf"
         for role in TYPES.values():
             result = Path(folder) / (role["code"] + ".docx")
             generate_docx(template, result, document_values(values, role))
             text = "\n".join(p.text for p in _all_paragraphs(Document(result)))
-            if result.stat().st_size < 1000 or "{{" in text or role["responsibilities"] not in text:
+            if (result.stat().st_size < 1000 or "{{" in text or
+                    document_values(values, role)["VERANTWOORDELIJKHEDEN"] not in text or
+                    combined not in text):
                 raise RuntimeError(f"Controle van het Word-document voor {role['code']} mislukt.")
 
 
@@ -625,9 +765,18 @@ def start():
                     picker = CatalogPicker(app, CatalogStore(), ("M",), "Machines")
                     picker.update()
                     assert picker.tree.exists("M01")
-                    picker._toggle("M01")
+                    from types import SimpleNamespace
+                    x, y, _w, h = picker.tree.bbox("M01")
+                    picker._clicked(SimpleNamespace(x=110, y=y + h // 2))
+                    assert "M01" not in picker.chosen  # klik op naam toont alleen uitleg
+                    picker._clicked(SimpleNamespace(x=20, y=y + h // 2))
+                    assert "M01" in picker.chosen  # rondje links kiest de code
                     picker._accept()
                     assert picker.answer == ["M01"]
+                    picker = CatalogPicker(app, CatalogStore(), tuple("LSMPR"), "Alle codes beheren", manage_only=True)
+                    picker.update()
+                    assert picker.tree.exists("M01") and picker.tree.exists("R01")
+                    picker._cancel()
                     app.geometry("900x620")
                     app.update()
                     assert app.scroll_canvas.winfo_width() > 400
@@ -638,6 +787,37 @@ def start():
                     app.update()
                     app.clear_fields()
                     assert app.summary["person"].get() == "Nog invullen"
+                    with tempfile.TemporaryDirectory() as folder:
+                        for key, value in {
+                            "ORGANISATIE": "Eqraft", "VOLLEDIGE_NAAM": "Mika van Eijken",
+                            "FUNCTIE": "Tijdelijke kracht", "INGANGSDATUM": "01-01-2026",
+                            "GELDIG_TOT": "01-01-2027", "LOCATIE": "Emmeloord",
+                            "INSTALLATIES": "M12 – Alle machines – uitsluitend mechanische taken",
+                            "WERKZAAMHEDEN": "L01 – mechanisch werk",
+                            "COMBINATIES": "Machine: M12 – Alle machines – uitsluitend mechanische taken\n"
+                                           "Bevoegdheden:\n• L01 – mechanisch werk",
+                            "BEVOEGDHEDEN": "Alleen mechanisch werk",
+                            "NAAM_AANWIJZER": "Aanwijzer", "FUNCTIE_AANWIJZER": "WV",
+                        }.items():
+                            widget = app.widgets[key]
+                            widget.insert("1.0" if isinstance(widget, tk.Text) else 0, value)
+                        app.settings = AppSettings(folder, "pdf")
+                        current_module = sys.modules[__name__]
+                        old_export = current_module.export_pdf
+                        old_dialog = app._dialog
+                        current_module.export_pdf = lambda *_args: (False, "Word ontbreekt (test).")
+                        app._dialog = lambda *_args, **_kwargs: True
+                        try:
+                            app.create_document()
+                            destination, _ = output_paths(folder, "ZZP", "Mika van Eijken",
+                                                          "01-01-2026")
+                            assert destination.is_file()  # PDF-only valt terug op DOCX
+                            app.settings.export_mode = "docx"
+                            app.create_document()
+                            assert destination.is_file() and destination.parent.parent.name == "ZZP"
+                        finally:
+                            current_module.export_pdf = old_export
+                            app._dialog = old_dialog
                 finally:
                     app.destroy()
         except Exception:
