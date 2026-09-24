@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   windows-exe:
@@ -23,7 +26,7 @@ jobs:
         run: python -m pip install -r requirements.txt
 
       - name: Bouw de Windows-app
-        run: python -m PyInstaller --onefile --noconsole --name NEN3140_Aanwijzingen --add-data 'templates;templates' main.py
+        run: python -m PyInstaller --onefile --noconsole --name NEN3140_Aanwijzingen --icon assets/eqraft_icon.ico --add-data 'templates;templates' --add-data 'assets;assets' --add-data 'documents;documents' main.py
 
       - name: Controleer het resultaat
         shell: pwsh
@@ -39,6 +42,44 @@ jobs:
           if ($process.ExitCode -ne 0) {
             throw "Controle van de exe is mislukt (exitcode $($process.ExitCode))."
           }
+
+      - name: Test het venster en alle rolkeuzes
+        shell: pwsh
+        run: |
+          $process = Start-Process -FilePath .\dist\NEN3140_Aanwijzingen.exe -ArgumentList '--ui-smoke-test' -PassThru -Wait
+          if ($process.ExitCode -ne 0) {
+            $errorFile = Join-Path $env:TEMP 'NEN3140_Aanwijzingen_fout.txt'
+            if (Test-Path $errorFile) { Get-Content $errorFile }
+            throw "Het venster kon niet starten (exitcode $($process.ExitCode))."
+          }
+
+      - name: Leg een schermafbeelding van het venster vast
+        shell: pwsh
+        run: |
+          try {
+            Add-Type -AssemblyName System.Windows.Forms
+            Add-Type -AssemblyName System.Drawing
+            $app = Start-Process -FilePath .\dist\NEN3140_Aanwijzingen.exe -PassThru
+            Start-Sleep -Seconds 4
+            $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bitmap = [System.Drawing.Bitmap]::new($bounds.Width, $bounds.Height)
+            $drawing = [System.Drawing.Graphics]::FromImage($bitmap)
+            $drawing.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+            $bitmap.Save('ui-preview.png')
+            $drawing.Dispose()
+            $bitmap.Dispose()
+          } catch {
+            Write-Host "Schermafbeelding niet beschikbaar: $_"
+          } finally {
+            if ($app) { Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue }
+          }
+
+      - name: Maak de schermafbeelding downloadbaar
+        uses: actions/upload-artifact@v4
+        with:
+          name: interface-controle
+          path: ui-preview.png
+          if-no-files-found: ignore
 
       - name: Maak exe downloadbaar
         uses: actions/upload-artifact@v4

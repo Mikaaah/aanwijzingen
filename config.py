@@ -91,6 +91,27 @@ TYPES = {
         ),
         "required_fields": (),
     },
+    "ZZP'er (tijdelijke inhuur)": {
+        "code": "ZZP", "template": TEMPLATE_NAME,
+        "title": "Aanwijzing tijdelijke inhuur (zzp'er)",
+        "role": "ZZP'er (tijdelijke inhuur; geen elektrotechnische aanwijzing)",
+        "intro": (
+            "Dit document legt de tijdelijke inzet en de persoonlijk afgesproken werkzaamheden vast. "
+            "De status van zzp'er verleent op zichzelf geen elektrotechnische bevoegdheid."
+        ),
+        "responsibilities": (
+            "Alleen de hier vastgelegde taken binnen het afgesproken werkgebied uitvoeren.\n"
+            "De ontvangen instructies en veiligheidsafspraken opvolgen.\n"
+            "Afwijkingen en onveilige omstandigheden direct melden en het werk zo nodig stoppen.\n"
+            "Voor elektrotechnisch werk is daarnaast een passende, afzonderlijke NEN 3140-aanwijzing vereist."
+        ),
+        "authorities": (
+            "Uitsluitend de persoonlijk vastgelegde mechanische werkzaamheden en het "
+            "uitdrukkelijk geïnstrueerde normale gebruik. Deze registratie geeft geen toestemming "
+            "voor elektrotechnische werkzaamheden."
+        ),
+        "required_fields": ("COMBINATIES",),
+    },
 }
 
 SECTIONS = (
@@ -107,9 +128,11 @@ SECTIONS = (
         ("Installatie(s) / installatiedelen", "INSTALLATIES", True, True),
         ("Verantwoordelijkheidsgebied", "VERANTWOORDELIJKHEIDSGEBIED", False, True),
         ("Specifieke werkzaamheden / instructies", "WERKZAAMHEDEN", False, True),
+        ("Toepasselijke procedures", "PROCEDURES", False, True),
     )),
     ("Bevoegdheden en grenzen", (
         ("Bevoegdheden / toegestane handelingen", "BEVOEGDHEDEN", True, True),
+        ("Bevoegdheden per machine", "COMBINATIES", False, True),
         ("Beperkingen / opmerkingen", "BEPERKINGEN", False, True),
     )),
     ("Namens de organisatie", (
@@ -125,13 +148,25 @@ SECTIONS = (
 
 DATE_FIELDS = ("INGANGSDATUM", "GELDIG_TOT", "DATUM_AANWIJZER", "DATUM_AANGEWEZENE")
 
+# Codelijsten komen op het moment van openen rechtstreeks uit Aanwijzingsmodel.docx.
+# Een vrije tekstinvoer blijft voor elk veld beschikbaar.
+PICKER_FIELDS = {
+    "INSTALLATIES": ("M",),
+    "WERKZAAMHEDEN": ("L", "S"),
+    "PROCEDURES": ("P",),
+    "BEVOEGDHEDEN": ("R",),
+}
+
 
 def document_values(input_values: dict[str, str], role: dict) -> dict[str, str]:
     """Alleen de velden met een rolafhankelijke inhoud automatisch invullen."""
     values = dict(input_values)
     values.update(
         DOCUMENTTITEL=role["title"], ROL=role["role"],
-        INLEIDING=role["intro"], VERANTWOORDELIJKHEDEN=role["responsibilities"],
+        INLEIDING=role["intro"],
+        VERANTWOORDELIJKHEDEN="\n".join(
+            "• " + line for line in role["responsibilities"].splitlines() if line.strip()
+        ),
         ROLBEVOEGDHEDEN=role["authorities"],
     )
     return values
@@ -147,4 +182,15 @@ def template_path(filename: str) -> Path:
         bundled = Path(sys._MEIPASS) / "templates" / filename
         if bundled.is_file():
             return bundled
+    return external
+
+
+def resource_path(filename: str) -> Path:
+    """Zoek afbeeldingen ook in de tijdelijke map van een PyInstaller-exe."""
+    program_dir = Path(sys.executable if getattr(sys, "frozen", False) else __file__).resolve().parent
+    external = program_dir / filename
+    if external.is_file():
+        return external
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS) / filename
     return external
