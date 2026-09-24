@@ -1,6 +1,7 @@
 """Eqraft-formulier voor het invullen van NEN 3140-aanwijzingssjablonen."""
 
 from datetime import datetime
+import os
 from pathlib import Path
 import re
 import sys
@@ -9,7 +10,10 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import traceback
 
-from config import APP_TITLE, DATE_FIELDS, SECTIONS, TYPES, document_values, template_path, resource_path
+from catalogus import CatalogStore, MODEL_NAME, merge_selected_lines
+from catalogus_venster import choose_codes, make_combination
+from config import (APP_TITLE, DATE_FIELDS, PICKER_FIELDS, SECTIONS, TYPES,
+                    document_values, template_path, resource_path)
 from document_generator import TemplateError, _all_paragraphs, export_pdf, generate_docx
 from ui_components import (ActionButton, BACKGROUND, BORDER, Card, DARK, ERROR,
                            INK, InputBox, MUTED, NavItem, SelectBox, SIDEBAR,
@@ -28,7 +32,9 @@ FIELD_TIPS = {
     "INSTALLATIES": "Welke machine, gebouwinstallatie of installatiedelen vallen hieronder?",
     "VERANTWOORDELIJKHEIDSGEBIED": "Waar begint en eindigt de verantwoordelijkheid van deze persoon?",
     "WERKZAAMHEDEN": "Voor VOP: beschrijf elke toegestane taak en de gegeven instructie.",
+    "PROCEDURES": "Kies P-codes. Vul documentnummer, revisie en gegeven instructie ook concreet in.",
     "BEVOEGDHEDEN": "Vul persoonlijke toestemming in. Het automatische rolkader staat apart in Word.",
+    "COMBINATIES": "Leg per bevoegdheid één taak + één object + de toepasselijke procedure en voorwaarden vast.",
     "BEPERKINGEN": "Noem uitgesloten taken, toezicht of afspraken bij afwijkingen.",
 }
 
@@ -59,6 +65,8 @@ class Application(tk.Tk):
         self.field_labels = {}
         self.field_frames = {}
         self.error_keys = set()
+        self.selected_codes = {key: [] for key in PICKER_FIELDS}
+        self.inserted_lines = {key: [] for key in PICKER_FIELDS}
         self.logo_image = None
         self.type_var = tk.StringVar(value=next(iter(TYPES)))
         self.role_preview = tk.StringVar()
@@ -177,10 +185,18 @@ class Application(tk.Tk):
                 field.grid(row=row, column=0 if multiline else col,
                            columnspan=2 if multiline else 1, sticky="ew",
                            padx=(0, 0 if multiline or col else 18), pady=(0, 18))
-                label_widget = tk.Label(field, text=label, bg=SURFACE, fg=INK,
+                label_row = tk.Frame(field, bg=SURFACE)
+                label_row.pack(fill="x", pady=(0, 7))
+                label_widget = tk.Label(label_row, text=label, bg=SURFACE, fg=INK,
                                         font=("Arial", 9, "bold"), anchor="w",
                                         wraplength=260, justify="left")
-                label_widget.pack(anchor="w", pady=(0, 7))
+                label_widget.pack(side="left", anchor="w")
+                if key in PICKER_FIELDS:
+                    ActionButton(label_row, "Kies codes", lambda chosen_key=key: self._choose_for(chosen_key),
+                                 width=124).pack(side="right")
+                elif key == "COMBINATIES":
+                    ActionButton(label_row, "Regel toevoegen", self._add_combination,
+                                 width=151).pack(side="right")
                 field.bind("<Configure>", lambda e, target=label_widget:
                            target.configure(wraplength=max(160, e.width - 8)))
                 self.field_labels[key] = (label_widget, label, required)
@@ -241,6 +257,7 @@ class Application(tk.Tk):
         NavItem(sidebar, "Aanwijzing maken", lambda: self.scroll_canvas.yview_moveto(0),
                 selected=True).pack(fill="x", padx=6, pady=(0, 7))
         NavItem(sidebar, "Uitleg en werkwijze", self._show_guide).pack(fill="x", padx=6)
+        NavItem(sidebar, "Aanwijzingsmodel", self._open_model).pack(fill="x", padx=6, pady=(7, 0))
 
         bottom = tk.Frame(sidebar, bg=SIDEBAR)
         bottom.pack(side="bottom", fill="x", padx=7, pady=(0, 12))
@@ -331,13 +348,65 @@ class Application(tk.Tk):
         self._dialog(
             "Zo werkt het",
             "1. Kies IV, WV, VP, VOP of Leek. Leek is een instructieregistratie.\n\n"
-            "2. Vul alle velden met * in. Beschrijf installaties, werkzaamheden en persoonlijke "
-            "bevoegdheden concreet. De rolteksten worden automatisch ingevuld.\n\n"
-            "3. Klik op Document maken en kies een opslagplaats. Controleer het Word-document "
-            "voordat het wordt ondertekend. Staat Microsoft Word op deze computer, dan wordt "
-            "ook een PDF gemaakt.",
+            "2. Vul de velden met * in. Met Kies codes selecteer je machines (M), taken (L/S), "
+            "procedures (P) en aanvullende bevoegdheden (R). Klik een code aan voor de uitleg. "
+            "Met Toevoegen voeg je zelf codes toe voor nieuwe machines of werkzaamheden.\n\n"
+            "3. Leg met Regel toevoegen per keer één concrete taak, één object, de toepasselijke "
+            "procedure en de voorwaarden vast. Losse keuzes geven geen algemene toestemming. "
+            "Vrije tekst blijft mogelijk.\n\n"
+            "4. Klik op Document maken, kies een opslagplaats en controleer het Word-document "
+            "vóór ondertekening. Met Microsoft Word wordt ook een PDF gemaakt.",
             kind="info",
         )
+
+    def _open_model(self):
+        model = resource_path(MODEL_NAME)
+        if not model.is_file():
+            self._dialog("Aanwijzingsmodel ontbreekt", f"Het Word-bestand is niet gevonden:\n{model}", kind="error")
+            return
+        try:
+            if sys.platform == "win32":
+                os.startfile(str(model))
+            else:
+                self._dialog("Aanwijzingsmodel", f"Het model staat op:\n{model}")
+        except OSError as exc:
+            self._dialog("Aanwijzingsmodel niet geopend", f"Open het bestand zelf in Word:\n{model}\n\n{exc}", kind="error")
+
+    def _choose_for(self, key):
+        try:
+            store = CatalogStore()
+        except (OSError, ValueError, FileNotFoundError) as exc:
+            self._dialog("Codelijst niet beschikbaar", str(exc), kind="error")
+            return
+        selected = choose_codes(self, store, PICKER_FIELDS[key], self.field_labels[key][1],
+                                set(self.selected_codes[key]), role_code=TYPES[self.type_var.get()]["code"])
+        if selected is None:
+            return
+        previous = self.inserted_lines[key]
+        current = [store.get(code).line for code in selected if store.get(code)]
+        widget = self.widgets[key]
+        merged = merge_selected_lines(widget.get("1.0", "end-1c"), previous, current)
+        widget.delete("1.0", "end")
+        widget.insert("1.0", merged)
+        self.selected_codes[key] = selected
+        self.inserted_lines[key] = current
+        self._field_changed(key)
+
+    def _add_combination(self):
+        try:
+            store = CatalogStore()
+        except (OSError, ValueError, FileNotFoundError) as exc:
+            self._dialog("Codelijst niet beschikbaar", str(exc), kind="error")
+            return
+        result = make_combination(self, store, is_leek=TYPES[self.type_var.get()]["code"] == "LEEK")
+        if not result:
+            return
+        widget = self.widgets["COMBINATIES"]
+        if widget.get("1.0", "end-1c").strip():
+            widget.insert("end", "\n\n")
+        widget.insert("end", result)
+        widget.see("end")
+        self._field_changed("COMBINATIES")
 
     def _dialog(self, title, message, kind="info", confirm=False):
         dialog = tk.Toplevel(self)
@@ -345,7 +414,8 @@ class Application(tk.Tk):
         dialog.configure(bg=BACKGROUND)
         dialog.resizable(False, False)
         dialog.transient(self)
-        dialog.geometry("510x390" if len(message) > 260 else "510x275")
+        dialog.geometry("510x460" if len(message) > 500 else
+                        "510x390" if len(message) > 260 else "510x275")
         dialog.minsize(510, 245)
         dialog.update_idletasks()
         dialog.geometry(f"+{self.winfo_rootx() + max(0, (self.winfo_width() - 510) // 2)}"
@@ -391,6 +461,15 @@ class Application(tk.Tk):
 
     def _validate(self, values):
         role = TYPES[self.type_var.get()]
+        if role["code"] == "LEEK":
+            chosen_skill_codes = set(re.findall(
+                r"\bS\d{2,4}[A-Z]?\b",
+                values["WERKZAAMHEDEN"] + "\n" + values["COMBINATIES"],
+            ))
+            if chosen_skill_codes - {"S02"}:
+                self._focus_field("WERKZAAMHEDEN")
+                raise ValueError("Een Leek kan geen elektrotechnische S-taken krijgen. "
+                                 "Gebruik L-codes voor mechanische taken; S02 alleen voor geïnstrueerd normaal gebruik.")
         missing = [label for _heading, fields in SECTIONS
                    for label, key, required, _multi in fields
                    if (required or key in role["required_fields"]) and not values[key]]
@@ -413,6 +492,14 @@ class Application(tk.Tk):
         if parsed["GELDIG_TOT"] < parsed["INGANGSDATUM"]:
             self._focus_field("GELDIG_TOT")
             raise ValueError("'Geldig tot' mag niet vóór de ingangsdatum liggen.")
+        selections_in_use = any(
+            line in values[key].splitlines()
+            for key, lines in self.inserted_lines.items() for line in lines
+        )
+        if selections_in_use and not values["COMBINATIES"]:
+            self._focus_field("COMBINATIES")
+            raise ValueError("Je hebt codes gekozen. Leg bij Persoonsgebonden bevoegdheidsregels "
+                             "eerst vast welke taak, machine, procedure en voorwaarden samen gelden.")
 
     def _focus_field(self, key):
         widget = self.widgets[key]
@@ -431,6 +518,9 @@ class Application(tk.Tk):
             else:
                 widget.delete(0, "end")
         self.error_keys.clear()
+        for key in PICKER_FIELDS:
+            self.selected_codes[key] = []
+            self.inserted_lines[key] = []
         for box in self.field_frames.values():
             box.state = "normal"
             box._draw()
@@ -496,6 +586,10 @@ class Application(tk.Tk):
 def self_test():
     """Genereer alle rollen en controleer op achtergebleven placeholders."""
     from docx import Document
+    catalog = CatalogStore()
+    for code in ("L01", "S03", "M01", "P01", "R01"):
+        if not catalog.get(code) or not catalog.get(code).name:
+            raise RuntimeError(f"Aanwijzingsmodel bevat geen bruikbare {code}.")
     template = template_path(next(iter(TYPES.values()))["template"])
     values = {key: "CONTROLE" for _heading, fields in SECTIONS
               for _label, key, _required, _multi in fields}
@@ -515,6 +609,7 @@ def start():
             if sys.argv[1:] == ["--self-test"]:
                 self_test()
             else:
+                from catalogus_venster import CatalogPicker
                 app = Application()
                 try:
                     for role in TYPES:
@@ -527,6 +622,12 @@ def start():
                     app._update_progress()
                     assert app.summary["person"].get() == "Controlepersoon"
                     assert app.summary["location"].get() == "Emmeloord"
+                    picker = CatalogPicker(app, CatalogStore(), ("M",), "Machines")
+                    picker.update()
+                    assert picker.tree.exists("M01")
+                    picker._toggle("M01")
+                    picker._accept()
+                    assert picker.answer == ["M01"]
                     app.geometry("900x620")
                     app.update()
                     assert app.scroll_canvas.winfo_width() > 400

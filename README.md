@@ -27,6 +27,8 @@ NEN3140_Aanwijzingen/
 ├── main.py
 ├── ui_components.py
 ├── config.py
+├── catalogus.py
+├── catalogus_venster.py
 ├── document_generator.py
 ├── requirements.txt
 ├── README.md
@@ -38,6 +40,8 @@ NEN3140_Aanwijzingen/
 │   └── eqraft_icon.ico
 ├── templates/
 │   └── Aanwijzing_NEN3140.docx
+├── documents/
+│   └── Aanwijzingsmodel.docx
 └── output/
 ```
 
@@ -66,6 +70,43 @@ en de **plaats en datum van aanwijzing** zijn ingevuld; bij IV en WV is ook het
 toegestane handelingen** de daadwerkelijk door Eqraft toegestane handelingen
 in. Alle data hebben formaat `dd-mm-jjjj`.
 
+## Keuzevensters en eigen aanvullingen
+
+Naast **Installaties**, **Werkzaamheden**, **Procedures** en **Bevoegdheden**
+staat **Kies codes**. Daar kun je zoeken en meer dan één item kiezen. Rechts
+verschijnt per code de toelichting uit `documents/Aanwijzingsmodel.docx`:
+
+| Veld | Codes |
+| --- | --- |
+| Installaties | M: machines en installatiedelen |
+| Werkzaamheden | L: mechanische taken; S: specifieke vaardigheden |
+| Procedures | P: procedureonderwerpen |
+| Bevoegdheden | R: aanvullende bevoegdheden |
+
+De knop **Toevoegen** in ieder keuzevenster laat je zelf een code, benaming en
+uitleg bewaren. Je kunt eigen codes later bewerken of verwijderen. Deze lijst
+wordt per Windows-gebruiker opgeslagen in
+`%LOCALAPPDATA%\Eqraft\NEN3140_Aanwijzingen\catalogus.json` en blijft na een
+update van de exe bestaan. De ingebouwde codes komen rechtstreeks uit het
+Word-model en zijn daarom alleen te wijzigen door dat document te vervangen.
+Zet desgewenst een aangepaste kopie in `documents\Aanwijzingsmodel.docx` naast
+de exe; die krijgt voorrang op de ingebouwde versie. In de zijbalk opent
+**Aanwijzingsmodel** het volledige Word-bestand.
+
+De geselecteerde **code en benaming** komen in het tekstveld en daarna in de
+aanwijzing. Vrije tekst kan daarnaast blijven staan. **S01** is volgens het
+model alleen een rubriektitel en is daarom niet selecteerbaar. Het aangeleverde
+model bevat geen aparte benaming voor M04 en M06; daarvoor gebruikt de app de
+omschrijving uit dezelfde modelrij. Voor M07 is geen verdere uitleg ingevuld.
+
+Met **Regel toevoegen** leg je één combinatie van taak, machine, eventuele
+procedure en concreet beschreven voorwaarden vast. Gebruik het veld
+**Persoonsgebonden bevoegdheidsregels** voor de daadwerkelijk overeengekomen
+combinaties; losse codes op zichzelf verlenen geen algemene toestemming. Als je
+codes selecteert, verlangt het programma daarom ook een bevoegdheidsregel.
+Controleer bij procedures altijd het echte documentnummer, de revisie en de
+instructie. Een eigen code of selectie is geen automatische NEN-aanwijzing.
+
 1. Kies IV, WV, VP, VOP of Leek. Bij Leek registreer je instructie; dit is geen elektrotechnische aanwijzing.
 2. Vul gegevens, installaties, taken, persoonlijke bevoegdheden en beperkingen in. De rolgebonden teksten volgen automatisch uit de gekozen rol.
 3. Klik op **Document maken**, kies waar je het Word-bestand opslaat en controleer het resultaat. Als Microsoft Word aanwezig is, wordt ook een PDF gemaakt.
@@ -87,6 +128,7 @@ Beschikbare invulvelden:
 {{INGANGSDATUM}}                 {{GELDIG_TOT}}
 {{LOCATIE}}                      {{INSTALLATIES}}
 {{VERANTWOORDELIJKHEIDSGEBIED}}  {{WERKZAAMHEDEN}}
+{{PROCEDURES}}                  {{COMBINATIES}}
 {{BEVOEGDHEDEN}}                 {{BEPERKINGEN}}
 {{NAAM_AANWIJZER}}               {{FUNCTIE_AANWIJZER}}
 {{PLAATS_AANWIJZING}}            {{DATUM_AANWIJZER}}
@@ -133,7 +175,7 @@ python main.py
 De exacte opdracht voor één Windows-exe:
 
 ```powershell
-python -m PyInstaller --onefile --noconsole --name NEN3140_Aanwijzingen --icon assets/eqraft_icon.ico --add-data "templates;templates" --add-data "assets;assets" main.py
+python -m PyInstaller --onefile --noconsole --name NEN3140_Aanwijzingen --icon assets/eqraft_icon.ico --add-data "templates;templates" --add-data "assets;assets" --add-data "documents;documents" main.py
 ```
 
 De Windows-bouwserver van GitHub voert deze opdracht automatisch uit bij een

@@ -107,9 +107,11 @@ SECTIONS = (
         ("Installatie(s) / installatiedelen", "INSTALLATIES", True, True),
         ("Verantwoordelijkheidsgebied", "VERANTWOORDELIJKHEIDSGEBIED", False, True),
         ("Specifieke werkzaamheden / instructies", "WERKZAAMHEDEN", False, True),
+        ("Toepasselijke procedures", "PROCEDURES", False, True),
     )),
     ("Bevoegdheden en grenzen", (
         ("Bevoegdheden / toegestane handelingen", "BEVOEGDHEDEN", True, True),
+        ("Persoonsgebonden bevoegdheidsregels", "COMBINATIES", False, True),
         ("Beperkingen / opmerkingen", "BEPERKINGEN", False, True),
     )),
     ("Namens de organisatie", (
@@ -124,6 +126,15 @@ SECTIONS = (
 )
 
 DATE_FIELDS = ("INGANGSDATUM", "GELDIG_TOT", "DATUM_AANWIJZER", "DATUM_AANGEWEZENE")
+
+# Codelijsten komen op het moment van openen rechtstreeks uit Aanwijzingsmodel.docx.
+# Een vrije tekstinvoer blijft voor elk veld beschikbaar.
+PICKER_FIELDS = {
+    "INSTALLATIES": ("M",),
+    "WERKZAAMHEDEN": ("L", "S"),
+    "PROCEDURES": ("P",),
+    "BEVOEGDHEDEN": ("R",),
+}
 
 
 def document_values(input_values: dict[str, str], role: dict) -> dict[str, str]:
