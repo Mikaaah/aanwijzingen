@@ -14,6 +14,16 @@ EXPORT_MODES = {
     "Alleen PDF": "pdf",
 }
 
+# De bestaande mappenstructuur van Eqraft onder AANWIJZINGEN.
+ROLE_FOLDERS = {
+    "IV": "01 - IV",
+    "WV": "02 - WV",
+    "VP": "03 - VP",
+    "VOP": "04 - VOP",
+    "LEEK": "05 - Leek",
+    "ZZP": "06 - ZZP",
+}
+
 
 @dataclass
 class AppSettings:
@@ -74,8 +84,10 @@ def safe_component(text: str) -> str:
 
 def output_paths(root: str | Path, role: str, person: str, date: str,
                  registration: bool = False) -> tuple[Path, Path]:
-    """Gebruik de geselecteerde hoofdmap / rol / persoonsnaam, zonder map aan te maken."""
-    folder = Path(root).expanduser() / safe_component(role) / safe_component(person)
+    """Gebruik AANWIJZINGEN / bestaande rolmap / persoonsnaam, zonder map aan te maken."""
+    if role not in ROLE_FOLDERS:
+        raise ValueError(f"Onbekend aanwijzingstype: {role}.")
+    folder = Path(root).expanduser() / ROLE_FOLDERS[role] / safe_component(person)
     prefix = "Registratie" if registration else "Aanwijzing"
     stem = f"{prefix} {role} - {safe_component(person)} - {date}"
     return folder / f"{stem}.docx", folder / f"{stem}.pdf"

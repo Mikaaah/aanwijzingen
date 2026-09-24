@@ -364,7 +364,7 @@ class Application(tk.Tk):
             "Voor M12 zijn uitsluitend mechanische L-taken mogelijk. De procedures elders in het formulier "
             "zijn optioneel; de bevoegdheidsregel vraagt er niet om.\n\n"
             "4. Kies bij Instellingen de hoofdmap AANWIJZINGEN en het gewenste bestandsformaat. "
-            "Document maken slaat daarna automatisch op onder rol / persoonsnaam. Controleer voor ondertekening.",
+            "Document maken slaat daarna automatisch op onder de bestaande rolmap (bijvoorbeeld 02 - WV) / persoonsnaam. Controleer voor ondertekening.",
             kind="info",
         )
 
@@ -403,7 +403,7 @@ class Application(tk.Tk):
                  bg=SURFACE, fg=MUTED, font=("Arial", 9)).pack(anchor="w", pady=(0, 19))
         tk.Label(body, text="Hoofdmap aanwijzingen", bg=SURFACE, fg=INK,
                  font=("Arial", 10, "bold")).pack(anchor="w")
-        tk.Label(body, text="Kies je bestaande map AANWIJZINGEN. Daaronder maakt de app rol / persoonsnaam aan.",
+        tk.Label(body, text="Kies je bestaande map AANWIJZINGEN. De app gebruikt daarin 01 - IV t/m 06 - ZZP en maakt per persoon een map aan.",
                  bg=SURFACE, fg=MUTED, font=("Arial", 9), wraplength=515,
                  justify="left").pack(anchor="w", pady=(2, 7))
         folder = tk.StringVar(value=self.settings.output_root)
@@ -661,6 +661,12 @@ class Application(tk.Tk):
                 confirm=True,
             ):
                 return
+            if not destination.parent.parent.is_dir():
+                raise FileNotFoundError(
+                    f"De bestaande rolmap ontbreekt:\n{destination.parent.parent}\n\n"
+                    "Kies bij Instellingen de bovenliggende map AANWIJZINGEN. "
+                    "De app maakt daarna alleen de persoonsmap aan."
+                )
             destination.parent.mkdir(parents=True, exist_ok=True)
             with tempfile.NamedTemporaryFile(suffix=".docx", prefix="nen3140_",
                                              dir=destination.parent, delete=False) as handle:
@@ -731,7 +737,7 @@ def self_test():
         save_settings(AppSettings(folder, "pdf"), path)
         assert load_settings(path).export_mode == "pdf"
         docx_path, pdf_path = output_paths(folder, "WV", "Mika van Eijken", "01-01-2026")
-        assert docx_path.parent.name == "Mika van Eijken" and docx_path.parent.parent.name == "WV"
+        assert docx_path.parent.name == "Mika van Eijken" and docx_path.parent.parent.name == "02 - WV"
         assert pdf_path.suffix == ".pdf"
         for role in TYPES.values():
             result = Path(folder) / (role["code"] + ".docx")
@@ -788,6 +794,7 @@ def start():
                     app.clear_fields()
                     assert app.summary["person"].get() == "Nog invullen"
                     with tempfile.TemporaryDirectory() as folder:
+                        (Path(folder) / "06 - ZZP").mkdir()
                         for key, value in {
                             "ORGANISATIE": "Eqraft", "VOLLEDIGE_NAAM": "Mika van Eijken",
                             "FUNCTIE": "Tijdelijke kracht", "INGANGSDATUM": "01-01-2026",
@@ -814,7 +821,7 @@ def start():
                             assert destination.is_file()  # PDF-only valt terug op DOCX
                             app.settings.export_mode = "docx"
                             app.create_document()
-                            assert destination.is_file() and destination.parent.parent.name == "ZZP"
+                            assert destination.is_file() and destination.parent.parent.name == "06 - ZZP"
                         finally:
                             current_module.export_pdf = old_export
                             app._dialog = old_dialog

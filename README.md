@@ -131,7 +131,7 @@ mechanische L-taken selecteerbaar.
 
 1. Kies IV, WV, VP, VOP, Leek of ZZP'er. Bij Leek en ZZP'er registreer je instructie en inzet; dit is geen elektrotechnische aanwijzing.
 2. Vul gegevens, installaties, taken, persoonlijke bevoegdheden en beperkingen in. De rolgebonden teksten volgen automatisch uit de gekozen rol.
-3. Kies in **Instellingen** één keer de bestaande hoofdmap **AANWIJZINGEN** en **Word en PDF**, **Alleen Word** of **Alleen PDF**. Daarna slaat **Document maken** op onder bijvoorbeeld `AANWIJZINGEN/WV/Mika van Eijken/`. Voor PDF is Microsoft Word nodig; bij **Alleen PDF** en zonder Word blijft een Word-document als terugvaloptie bewaard. Instellingen worden bewaard in `%LOCALAPPDATA%\Eqraft\NEN3140_Aanwijzingen\instellingen.json`.
+3. Kies in **Instellingen** één keer de bestaande hoofdmap **AANWIJZINGEN** en **Word en PDF**, **Alleen Word** of **Alleen PDF**. Daarna gebruikt **Document maken** de bestaande mappen `01 - IV`, `02 - WV`, `03 - VP`, `04 - VOP`, `05 - Leek` of `06 - ZZP`, bijvoorbeeld `AANWIJZINGEN/02 - WV/Mika van Eijken/`. De app maakt de persoonsmap aan als die ontbreekt. Voor PDF is Microsoft Word nodig; bij **Alleen PDF** en zonder Word blijft een Word-document als terugvaloptie bewaard. Instellingen worden bewaard in `%LOCALAPPDATA%\Eqraft\NEN3140_Aanwijzingen\instellingen.json`.
 
 De aanwijzer beoordeelt de kennis en ervaring van de persoon, de concrete
 werkzaamheden en de grenzen vóór ondertekening. Het programma kan die
